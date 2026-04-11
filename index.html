@@ -507,13 +507,12 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
       REGNBUELIGAEN</div>
     <div class="modal-title">Login for<br>diktatorer</div>
     <div class="modal-sub">Kun for de med makt</div>
-    <label>Brukernavn</label>
+    <label>E-post</label>
     <input type="email" id="login-user" placeholder="admin@regnbueligaen.com" autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()">
     <label>Passord</label>
     <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn-login" onclick="doLogin()">Logg inn</button>
     <div class="login-error" id="login-error"></div>
-    <div class="modal-hint">Standard: admin / regnbue2025</div>
   </div>
 </div>
 
@@ -970,17 +969,26 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLoginModal();})
 function doLogin(){
   const email=document.getElementById('login-user').value.trim();
   const pass=document.getElementById('login-pass').value;
+  console.log('Attempting login with:', email);
   auth.signInWithEmailAndPassword(email, pass)
     .then(()=>{
       document.getElementById('login-pass').value='';
       document.getElementById('login-user').value='';
       closeLoginModal();
     })
-    .catch(()=>{
+    .catch(e=>{
       const el=document.getElementById('login-error');
-      el.textContent='Feil e-post eller passord.';
+      console.error('Firebase login error:', e.code, e.message);
+      const msg = e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found'
+        ? 'Feil e-post eller passord.'
+        : e.code==='auth/invalid-email'
+        ? 'Ugyldig e-postformat.'
+        : e.code==='auth/too-many-requests'
+        ? 'For mange forsøk. Prøv igjen senere.'
+        : 'Innlogging feilet: ' + e.code;
+      el.textContent=msg;
       document.getElementById('login-pass').value='';
-      setTimeout(()=>el.textContent='',3000);
+      setTimeout(()=>el.textContent='',6000);
     });
 }
 function doLogout(){
@@ -2578,6 +2586,7 @@ function saveRules(exId, val){
 
 // Firebase Auth state – single source of truth for admin
 auth.onAuthStateChanged(user => {
+  console.log('onAuthStateChanged fired, user:', user ? user.email : 'null');
   isAdmin = !!user;
   if(isAdmin){
     document.getElementById('dictator-btn').style.display='none';
