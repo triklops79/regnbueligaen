@@ -890,6 +890,32 @@ function loadFromCloud(){
           data[key] = Object.values(data[key]);
         }
       });
+      // Fix members arrays
+      if(data.members) {
+        ['cocky','ossia','bergen','teisen'].forEach(t => {
+          if(data.members[t] && !Array.isArray(data.members[t])) {
+            data.members[t] = Object.values(data.members[t]);
+          }
+        });
+      }
+      // Fix tournaments - each tournament may have arrays inside
+      if(data.tournaments) {
+        Object.keys(data.tournaments).forEach(tid => {
+          const t = data.tournaments[tid];
+          if(t && t.players && !Array.isArray(t.players)) {
+            t.players = Object.values(t.players);
+          }
+          if(t && t.rounds && !Array.isArray(t.rounds)) {
+            t.rounds = Object.values(t.rounds);
+          }
+          if(t && t.log && !Array.isArray(t.log)) {
+            t.log = Object.values(t.log);
+          }
+          if(t && t.teams && !Array.isArray(t.teams)) {
+            t.teams = Object.values(t.teams);
+          }
+        });
+      }
       state = data;
       migrateState();
     } else {
