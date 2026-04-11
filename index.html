@@ -1982,7 +1982,7 @@ function renderKillerDartHTML(exId, name, editable){
       ${kd.teams.map((t,i)=>{
         const tm=TEAMS[i];
         const dead=t.lives<=0;
-        const hearts=[...Array(3)].map((_,h)=>editable
+        const hearts=[...Array(4)].map((_,h)=>editable
           ? `<span class="kd-heart${h>=t.lives?' lost':''}" style="cursor:pointer;" onclick="kdToggleLife('${exId}',${i},${h})">❤️</span>`
           : `<span class="kd-heart${h>=t.lives?' lost':''}">❤️</span>`
         ).join('');
