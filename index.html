@@ -884,39 +884,28 @@ function loadFromCloud(){
     console.log('exercises type:', data ? typeof data.exercises : 'no data');
     console.log('exercises isArray:', data ? Array.isArray(data.exercises) : 'no data');
     if(data) {
-      // Convert any Firebase object-arrays back to real arrays
-      ['exercises','templates'].forEach(key => {
-        if(data[key] && !Array.isArray(data[key])) {
-          data[key] = Object.values(data[key]);
+      // Firebase converts ALL arrays to objects with numeric keys.
+      // Fix recursively before doing anything else.
+      function fixArrays(obj) {
+        if(!obj || typeof obj !== 'object') return obj;
+        if(Array.isArray(obj)) {
+          obj.forEach(fixArrays);
+          return obj;
         }
-      });
-      // Fix members arrays
-      if(data.members) {
-        ['cocky','ossia','bergen','teisen'].forEach(t => {
-          if(data.members[t] && !Array.isArray(data.members[t])) {
-            data.members[t] = Object.values(data.members[t]);
-          }
-        });
+        // Check if this object looks like a Firebase-converted array
+        // (all keys are numeric strings: "0", "1", "2", ...)
+        const keys = Object.keys(obj);
+        const isNumeric = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
+        if(isNumeric) {
+          const arr = keys.sort((a,b)=>Number(a)-Number(b)).map(k => fixArrays(obj[k]));
+          return arr;
+        }
+        // Regular object - recurse into values
+        keys.forEach(k => { obj[k] = fixArrays(obj[k]); });
+        return obj;
       }
-      // Fix tournaments - each tournament may have arrays inside
-      if(data.tournaments) {
-        Object.keys(data.tournaments).forEach(tid => {
-          const t = data.tournaments[tid];
-          if(t && t.players && !Array.isArray(t.players)) {
-            t.players = Object.values(t.players);
-          }
-          if(t && t.rounds && !Array.isArray(t.rounds)) {
-            t.rounds = Object.values(t.rounds);
-          }
-          if(t && t.log && !Array.isArray(t.log)) {
-            t.log = Object.values(t.log);
-          }
-          if(t && t.teams && !Array.isArray(t.teams)) {
-            t.teams = Object.values(t.teams);
-          }
-        });
-      }
-      state = data;
+      const fixed = fixArrays(data);
+      state = fixed;
       migrateState();
     } else {
       state = defaultState();
@@ -1957,8 +1946,11 @@ function renderKillerDartHTML(exId, name, editable){
   const kd = state.tournaments[exId];
   if(!kd) return '';
 
+  // Ensure arrays are arrays (Firebase converts them to objects)
+  if(!kd.teams || !Array.isArray(kd.teams)) kd.teams = kd.teams ? Object.values(kd.teams) : TEAMS.map(t=>({id:t.id,lives:3}));
+  if(!kd.log || !Array.isArray(kd.log)) kd.log = kd.log ? Object.values(kd.log) : [];
+
   // Setup phase
-  // Auto-start if still in setup phase
   if(kd.phase==='setup') kd.phase='playing';
 
   // Playing / done
