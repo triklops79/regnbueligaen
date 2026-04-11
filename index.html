@@ -837,8 +837,8 @@ const firebaseConfig = {
 // Firebase init
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-const dbRef = db.ref('/');
-const backupRef = db.ref('/_backup');
+const dbRef = db.ref('/state');
+const backupRef = db.ref('/backup');
 const auth = firebase.auth();
 
 function saveBackup(){
