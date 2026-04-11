@@ -870,6 +870,13 @@ function migrateState(){
   if(!state.scores) state.scores = {};
   if(!state.members) state.members = {cocky:[],ossia:[],bergen:[],teisen:[]};
   if(!state.pointScheme) state.pointScheme = {1:10,2:6,3:3,4:1};
+  // Normalize pointScheme keys to numbers (Firebase stores as strings)
+  if(state.pointScheme) {
+    const ps = state.pointScheme;
+    if(ps["1"]!==undefined && ps[1]===undefined) {
+      state.pointScheme = {1:ps["1"],2:ps["2"],3:ps["3"],4:ps["4"]};
+    }
+  }
   if(!state.program || !state.program.days) { state.program = defaultState().program; dirty=true; }
   if(!state.templates) state.templates = [];
   state.exercises.forEach(ex => {
