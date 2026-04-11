@@ -27,7 +27,8 @@
 body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;overflow-x:hidden;}
 
 /* HEADER */
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:66px;position:sticky;top:0;z-index:100;box-shadow:0 4px 30px rgba(0,0,0,.5);}
+.header-inner{max-width:1200px;width:100%;margin:0 auto;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0;display:flex;align-items:center;justify-content:center;height:66px;position:sticky;top:0;z-index:100;box-shadow:0 4px 30px rgba(0,0,0,.5);}
 .logo{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;cursor:pointer;user-select:none;}
 .header-right{display:flex;align-items:center;gap:.4rem;}
 nav{display:flex;gap:.25rem;}
@@ -411,7 +412,9 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 
   /* Header */
   header{padding:.5rem 0;height:auto;flex-wrap:wrap;gap:.25rem;}
+  .header-inner{flex-direction:column;padding:0;gap:.25rem;align-items:flex-start;width:100%;max-width:none;}
   .logo{width:100%;font-size:14.5vw;letter-spacing:0;padding:0 .35rem;box-sizing:border-box;}
+  .logo span{top:-0.08em;}
   .header-right{width:100%;display:flex;flex-direction:column;gap:.25rem;}
   nav{display:flex;width:100%;gap:0;padding:0 .75rem;box-sizing:border-box;}
   nav button{flex:1;font-size:1.05rem;padding:.5rem .2rem;letter-spacing:.5px;text-align:center;}
@@ -514,7 +517,8 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 </div>
 
 <header>
-  <div class="logo" onclick="showSection('dashboard')" style="display:flex;align-items:flex-start;gap:.15rem;width:100%;">
+  <div class="header-inner">
+  <div class="logo" onclick="showSection('dashboard')" style="display:flex;align-items:flex-start;gap:.15rem;width:auto;">
       <svg viewBox="0 0 28 18" xmlns="http://www.w3.org/2000/svg" style="border-radius:3px;flex-shrink:0;height:0.75em;width:auto;position:relative;top:0;">
         <rect width="28" height="3" y="0" fill="#E40303"/>
         <rect width="28" height="3" y="3" fill="#FF8C00"/>
@@ -539,6 +543,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
       <span id="sync-status" style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;letter-spacing:1px;color:var(--muted);opacity:0;transition:.5s;"></span>
       <button class="btn-install-trigger" onclick="openInstallModal()">📲 Installer appen</button>
     </div>
+  </div>
   </div>
 </header>
 
