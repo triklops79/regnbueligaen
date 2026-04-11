@@ -1469,6 +1469,7 @@ function renderResults(){
     if(ex.type==='axecup') return renderAxeCupHTML(ex.id,ex.name,true);
 
     const s=state.scores[ex.id]||{};
+    const resetScoreBtn=`<button class="btn btn-danger btn-sm" style="margin-top:.8rem;" onclick="resetExerciseScores('${ex.id}')">↺ Nullstill poeng</button>`;
     if(ex.type==='ranking'){
       return `<div class="card" style="margin-bottom:1.5rem;">
         <div class="flex-between" style="margin-bottom:1rem;">
@@ -1476,6 +1477,7 @@ function renderResults(){
           <div style="color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.78rem;text-transform:uppercase;letter-spacing:1px;">${schemeStr}</div></div>
           <span class="tag tag-ranking">Rangering</span>
         </div>
+        ${resetScoreBtn}
         <div class="score-inputs">${TEAMS.map(t=>{
           const curPts=s[t.id]||0;const curRank=[1,2,3,4].find(r=>state.pointScheme[r]===curPts&&curPts>0)||0;
           return `<div class="sig"><label class="${t.tc}">${t.name}</label>
@@ -2549,6 +2551,14 @@ function progDeleteDay(dayId){
   saveBackup();
   state.program.days=state.program.days.filter(d=>d.id!==dayId);
   save(); renderProgram();
+}
+
+
+function resetExerciseScores(exId){
+  if(!confirm('Nullstille poengene for denne øvelsen?')) return;
+  saveBackup();
+  state.scores[exId]={cocky:0,ossia:0,bergen:0,teisen:0};
+  save();renderDashboard();renderResults();toast('Poeng nullstilt');
 }
 
 // ===== TEMPLATE LIBRARY =====
