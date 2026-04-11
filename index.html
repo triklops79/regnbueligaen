@@ -410,13 +410,16 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
   main{padding:.75rem;max-width:100%;}
 
   /* Header */
-  header{padding:.5rem .75rem;height:auto;flex-wrap:wrap;gap:.3rem;}
+  header{padding:.5rem .75rem;height:auto;flex-wrap:wrap;gap:.25rem;}
   .logo{font-size:1.3rem;}
-  .header-right{width:100%;display:flex;flex-wrap:wrap;gap:.25rem;justify-content:space-between;}
-  nav{display:flex;flex-wrap:wrap;gap:.2rem;width:100%;}
-  nav button{font-size:.72rem;padding:.28rem .4rem;letter-spacing:.5px;}
-  #sync-status{font-size:.65rem;}
+  .header-right{width:100%;display:flex;flex-direction:column;gap:.25rem;}
+  nav{display:flex;width:100%;gap:0;}
+  nav button{flex:1;font-size:.85rem;padding:.45rem .2rem;letter-spacing:.3px;text-align:center;}
+  /* Bottom row: dictator | sync | install */
+  .header-bottom-row{display:flex;align-items:center;justify-content:space-between;width:100%;padding:.1rem 0;}
+  #sync-status{font-size:.68rem;text-align:center;flex:1;}
   .btn-dictator,.btn-logout{font-size:.72rem;padding:.28rem .5rem;}
+  .btn-install-trigger{font-size:.72rem;padding:.28rem .5rem;}
 
   /* Cards */
   .card{padding:1rem;}
@@ -530,10 +533,12 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
       <button id="results-tab" onclick="showSection('results')">Poengføring</button>
       <button id="admin-tab" onclick="showSection('admin')">⚙ Admin</button>
     </nav>
-    <span id="sync-status" style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;letter-spacing:1px;color:var(--muted);opacity:0;transition:.5s;"></span>
-    <button class="btn-install-trigger" onclick="openInstallModal()">📲 Installer appen</button>
-    <button class="btn-dictator" id="dictator-btn" onclick="openLoginModal()">Login for diktatorer</button>
-    <button class="btn-logout" id="logout-btn" style="display:none;" onclick="doLogout()">Logg ut</button>
+    <div class="header-bottom-row">
+      <button class="btn-dictator" id="dictator-btn" onclick="openLoginModal()">Login for diktatorer</button>
+      <button class="btn-logout" id="logout-btn" style="display:none;" onclick="doLogout()">Logg ut</button>
+      <span id="sync-status" style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;letter-spacing:1px;color:var(--muted);opacity:0;transition:.5s;"></span>
+      <button class="btn-install-trigger" onclick="openInstallModal()">📲 Installer appen</button>
+    </div>
   </div>
 </header>
 
