@@ -1344,6 +1344,10 @@ function renderTournamentBracketHTML(exId,name,editable){
     </div>`;
   }
 
+  if(!t.semi1) t.semi1={a:null,b:null,scoreA:null,scoreB:null};
+  if(!t.semi2) t.semi2={a:null,b:null,scoreA:null,scoreB:null};
+  if(!t.final) t.final={a:null,b:null,scoreA:null,scoreB:null};
+  if(!t.bronze) t.bronze={a:null,b:null,scoreA:null,scoreB:null};
   const s1HTML=matchCardClean(t.semi1,'Semifinale 1','',false);
   const s2HTML=matchCardClean(t.semi2,'Semifinale 2','',false);
   const finHTML=matchCardClean(t.final,'🏆 Finale','final-label',true);
@@ -1763,6 +1767,12 @@ function renderKnockoutEntry(exId,name){
     <div class="info-box" style="margin-bottom:.8rem;">Lagene trekkes tilfeldig – som et myntkast. Klikk knappen for å trekke motstandere.</div>
     <button class="btn btn-gold" onclick="startKnockout('${exId}')">🎲 Trekk semifinaler tilfeldig</button>`:'';
 
+
+  // Ensure knockout structure always exists
+  if(!t.semi1) t.semi1={a:null,b:null,scoreA:null,scoreB:null};
+  if(!t.semi2) t.semi2={a:null,b:null,scoreA:null,scoreB:null};
+  if(!t.final) t.final={a:null,b:null,scoreA:null,scoreB:null};
+  if(!t.bronze) t.bronze={a:null,b:null,scoreA:null,scoreB:null};
 
   let knockoutScoreHTML='';
   if(t.phase==='knockout'||t.phase==='done'){
