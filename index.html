@@ -411,7 +411,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 
   /* Header */
   header{padding:.5rem .75rem;height:auto;flex-wrap:wrap;gap:.25rem;}
-  .logo{font-size:2rem;width:100%;letter-spacing:3px;justify-content:space-between;}
+  .logo{width:100%;font-size:9.1vw;letter-spacing:0.08em;}
   .header-right{width:100%;display:flex;flex-direction:column;gap:.25rem;}
   nav{display:flex;width:100%;gap:0;}
   nav button{flex:1;font-size:1.05rem;padding:.5rem .2rem;letter-spacing:.5px;text-align:center;}
@@ -514,8 +514,8 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 </div>
 
 <header>
-  <div class="logo" onclick="showSection('dashboard')" style="display:flex;align-items:center;gap:.6rem;">
-      <svg width="36" height="23" viewBox="0 0 28 18" xmlns="http://www.w3.org/2000/svg" style="border-radius:3px;flex-shrink:0;">
+  <div class="logo" onclick="showSection('dashboard')" style="display:flex;align-items:center;gap:.4rem;width:100%;">
+      <svg viewBox="0 0 28 18" xmlns="http://www.w3.org/2000/svg" style="border-radius:3px;flex-shrink:0;height:1em;width:auto;">
         <rect width="28" height="3" y="0" fill="#E40303"/>
         <rect width="28" height="3" y="3" fill="#FF8C00"/>
         <rect width="28" height="3" y="6" fill="#FFED00"/>
@@ -523,7 +523,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
         <rect width="28" height="3" y="12" fill="#004DFF"/>
         <rect width="28" height="3" y="15" fill="#750787"/>
       </svg>
-      Regnbueligaen</div>
+      <span style="flex:1;white-space:nowrap;overflow:hidden;">Regnbueligaen</span></div>
   <div class="header-right">
     <nav>
       <button class="active" onclick="showSection('dashboard')">Tabell</button>
