@@ -1463,11 +1463,12 @@ function renderResults(){
   const schemeStr=`🥇${state.pointScheme[1]} 🥈${state.pointScheme[2]} 🥉${state.pointScheme[3]} 4.plass ${state.pointScheme[4]}`;
 
   wrap.innerHTML=state.exercises.map(ex=>{
-    const resetScoreBtn=`<div style="margin-top:.5rem;"><button class="btn btn-danger btn-sm" onclick="resetExerciseScores('${ex.id}')">↺ Nullstill poeng for ${ex.name}</button></div>`;
-    if(ex.type==='tournament') return renderTournamentEntry(ex.id,ex.name)+resetScoreBtn;
-    if(ex.type==='knockout') return renderKnockoutEntry(ex.id,ex.name)+resetScoreBtn;
-    if(ex.type==='killerdart') return renderKillerDartHTML(ex.id,ex.name,true)+resetScoreBtn;
-    if(ex.type==='axecup') return renderAxeCupHTML(ex.id,ex.name,true)+resetScoreBtn;
+    const resetScoreBtn=`<div style="display:flex;justify-content:flex-end;margin-top:.8rem;"><button class="btn btn-danger btn-sm" onclick="resetExerciseScores('${ex.id}')">↺ Nullstill poeng</button></div>`;
+    function injectReset(html){ return html.replace(/<\/div>\s*$/, resetScoreBtn+'</div>'); }
+    if(ex.type==='tournament') return injectReset(renderTournamentEntry(ex.id,ex.name));
+    if(ex.type==='knockout') return injectReset(renderKnockoutEntry(ex.id,ex.name));
+    if(ex.type==='killerdart') return injectReset(renderKillerDartHTML(ex.id,ex.name,true));
+    if(ex.type==='axecup') return injectReset(renderAxeCupHTML(ex.id,ex.name,true));
 
     const s=state.scores[ex.id]||{};
     if(ex.type==='ranking'){
@@ -1477,7 +1478,6 @@ function renderResults(){
           <div style="color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.78rem;text-transform:uppercase;letter-spacing:1px;">${schemeStr}</div></div>
           <span class="tag tag-ranking">Rangering</span>
         </div>
-        ${resetScoreBtn}
         <div class="score-inputs">${TEAMS.map(t=>{
           const curPts=s[t.id]||0;const curRank=[1,2,3,4].find(r=>state.pointScheme[r]===curPts&&curPts>0)||0;
           return `<div class="sig"><label class="${t.tc}">${t.name}</label>
