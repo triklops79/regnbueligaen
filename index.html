@@ -674,14 +674,10 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
           </div>
           <div id="admin-members-list"></div>
         </div>
-        <div class="card" style="border-color:rgba(255,77,77,.2);">
-          <div class="admin-section-head" style="color:#ff6b6b;">⚠️ Farlig sone</div>
-          <div style="color:var(--muted2);font-size:.88rem;margin-bottom:1rem;">Disse handlingene kan ikke angres!</div>
-          <div style="display:flex;gap:.7rem;flex-wrap:wrap;">
-            <button class="btn btn-danger" onclick="confirmReset('scores')">Nullstill alle poeng</button>
-            <button class="btn btn-admin" onclick="restoreBackup()">↩ Gjenopprett forrige versjon</button>
-            <button class="btn btn-danger" onclick="confirmReset('members')">Fjern alle spillere</button>
-          </div>
+        <div class="card" style="border-color:rgba(255,255,255,.05);">
+          <div class="admin-section-head">↩ Gjenopprett</div>
+          <div style="color:var(--muted2);font-size:.88rem;margin-bottom:1rem;">Angre siste endring og hente tilbake forrige versjon av all data.</div>
+          <button class="btn btn-admin" onclick="restoreBackup()">↩ Gjenopprett forrige versjon</button>
         </div>
       </div>
     </div>
@@ -1916,7 +1912,7 @@ function kdLoseLife(exId, teamIdx){
 function kdUndoLast(exId){
   // Simple undo: reload from a snapshot
   // We don't store full snapshots so just warn
-  toast('Tips: Bruk «Tilbakestill» i Farlig sone hvis noe går galt.','error');
+
 }
 
 function kdCheckWinner(exId){
