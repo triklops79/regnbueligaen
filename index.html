@@ -1463,13 +1463,13 @@ function renderResults(){
   const schemeStr=`🥇${state.pointScheme[1]} 🥈${state.pointScheme[2]} 🥉${state.pointScheme[3]} 4.plass ${state.pointScheme[4]}`;
 
   wrap.innerHTML=state.exercises.map(ex=>{
-    if(ex.type==='tournament') return renderTournamentEntry(ex.id,ex.name);
-    if(ex.type==='knockout') return renderKnockoutEntry(ex.id,ex.name);
-    if(ex.type==='killerdart') return renderKillerDartHTML(ex.id,ex.name,true);
-    if(ex.type==='axecup') return renderAxeCupHTML(ex.id,ex.name,true);
+    const resetScoreBtn=`<div style="margin-top:.5rem;"><button class="btn btn-danger btn-sm" onclick="resetExerciseScores('${ex.id}')">↺ Nullstill poeng for ${ex.name}</button></div>`;
+    if(ex.type==='tournament') return renderTournamentEntry(ex.id,ex.name)+resetScoreBtn;
+    if(ex.type==='knockout') return renderKnockoutEntry(ex.id,ex.name)+resetScoreBtn;
+    if(ex.type==='killerdart') return renderKillerDartHTML(ex.id,ex.name,true)+resetScoreBtn;
+    if(ex.type==='axecup') return renderAxeCupHTML(ex.id,ex.name,true)+resetScoreBtn;
 
     const s=state.scores[ex.id]||{};
-    const resetScoreBtn=`<button class="btn btn-danger btn-sm" style="margin-top:.8rem;" onclick="resetExerciseScores('${ex.id}')">↺ Nullstill poeng</button>`;
     if(ex.type==='ranking'){
       return `<div class="card" style="margin-bottom:1.5rem;">
         <div class="flex-between" style="margin-bottom:1rem;">
