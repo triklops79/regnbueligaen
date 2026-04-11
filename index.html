@@ -411,7 +411,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 
   /* Header */
   header{padding:.5rem .75rem;height:auto;flex-wrap:wrap;gap:.25rem;}
-  .logo{font-size:6.8vw;width:100%;justify-content:flex-start;letter-spacing:1.5vw;}
+  .logo{font-size:2rem;width:100%;letter-spacing:3px;}
   .header-right{width:100%;display:flex;flex-direction:column;gap:.25rem;}
   nav{display:flex;width:100%;gap:0;}
   nav button{flex:1;font-size:1.05rem;padding:.5rem .2rem;letter-spacing:.5px;text-align:center;}
@@ -523,7 +523,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
         <rect width="28" height="3" y="12" fill="#004DFF"/>
         <rect width="28" height="3" y="15" fill="#750787"/>
       </svg>
-      Regnbueligaen</div>
+      <span class="logo-text" style="display:inline-block;white-space:nowrap;">Regnbueligaen</span></div>
   <div class="header-right">
     <nav>
       <button class="active" onclick="showSection('dashboard')">Tabell</button>
@@ -2582,6 +2582,26 @@ if(isAdmin){
   document.getElementById('results-tab').classList.add('visible');
   document.getElementById('admin-tab').classList.add('visible');
 }
+// Scale logo to fill header width on mobile
+function scaleLogo(){
+  const logo = document.querySelector('.logo');
+  if(!logo) return;
+  const text = logo.querySelector('.logo-text');
+  if(!text) return;
+  if(window.innerWidth > 640) {
+    text.style.transform = '';
+    return;
+  }
+  const container = logo.parentElement.offsetWidth;
+  const logoW = logo.offsetWidth;
+  const textW = text.scrollWidth;
+  const scale = logoW / textW;
+  text.style.transformOrigin = 'left center';
+  text.style.transform = 'scaleX(' + Math.min(scale, 2) + ')';
+}
+window.addEventListener('load', scaleLogo);
+window.addEventListener('resize', scaleLogo);
+
 // Register service worker for PWA
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
