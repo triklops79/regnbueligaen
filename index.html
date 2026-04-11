@@ -13,6 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -507,7 +508,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
     <div class="modal-title">Login for<br>diktatorer</div>
     <div class="modal-sub">Kun for de med makt</div>
     <label>Brukernavn</label>
-    <input type="text" id="login-user" placeholder="admin" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+    <input type="email" id="login-user" placeholder="admin@regnbueligaen.com" autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()">
     <label>Passord</label>
     <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn-login" onclick="doLogin()">Logg inn</button>
@@ -789,7 +790,6 @@ function defaultState(){
     scores:{},       // non-tournament scores
     tournaments:{},  // tournament data per exercise id
     pointScheme:{1:10,2:6,3:3,4:1},
-    credentials:{user:'admin',pass:'regnbue2025'},
     templates:[],
     program:{
       title:'Malahide',
@@ -843,9 +843,10 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const dbRef = db.ref('/');
+const auth = firebase.auth();
 
 let state = defaultState();
-let isAdmin = sessionStorage.getItem('rbl_admin') === '1';
+let isAdmin = false;
 let saveTimer = null;
 
 function migrateState(){
@@ -855,7 +856,6 @@ function migrateState(){
   if(!state.scores) state.scores = {};
   if(!state.members) state.members = {cocky:[],ossia:[],bergen:[],teisen:[]};
   if(!state.pointScheme) state.pointScheme = {1:10,2:6,3:3,4:1};
-  if(!state.credentials) state.credentials = {user:'admin',pass:'regnbue2025'};
   if(!state.program) { state.program = defaultState().program; dirty=true; }
   if(!state.templates) state.templates = [];
   state.exercises.forEach(ex => {
@@ -968,30 +968,23 @@ function handleModalClick(e){if(e.target===document.getElementById('login-modal'
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLoginModal();});
 
 function doLogin(){
-  const u=document.getElementById('login-user').value.trim();
-  const p=document.getElementById('login-pass').value;
-  if(u===state.credentials.user&&p===state.credentials.pass){
-    isAdmin=true;sessionStorage.setItem('rbl_admin','1');closeLoginModal();
-    document.getElementById('dictator-btn').style.display='none';
-    document.getElementById('logout-btn').style.display='inline-block';
-    document.getElementById('results-tab').classList.add('visible');
-    document.getElementById('admin-tab').classList.add('visible');
-    document.getElementById('login-pass').value='';document.getElementById('login-user').value='';
-    showSection('admin');toast('Velkommen, diktator 👑');
-  } else {
-    const el=document.getElementById('login-error');
-    el.textContent='Feil brukernavn eller passord.';
-    document.getElementById('login-pass').value='';
-    setTimeout(()=>el.textContent='',3000);
-  }
+  const email=document.getElementById('login-user').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  auth.signInWithEmailAndPassword(email, pass)
+    .then(()=>{
+      document.getElementById('login-pass').value='';
+      document.getElementById('login-user').value='';
+      closeLoginModal();
+    })
+    .catch(()=>{
+      const el=document.getElementById('login-error');
+      el.textContent='Feil e-post eller passord.';
+      document.getElementById('login-pass').value='';
+      setTimeout(()=>el.textContent='',3000);
+    });
 }
 function doLogout(){
-  isAdmin=false;sessionStorage.removeItem('rbl_admin');
-  document.getElementById('dictator-btn').style.display='inline-block';
-  document.getElementById('logout-btn').style.display='none';
-  document.getElementById('results-tab').classList.remove('visible');
-  document.getElementById('admin-tab').classList.remove('visible');
-  showSection('dashboard');toast('Logget ut','error');
+  auth.signOut();
 }
 function changePassword(){
   const np=document.getElementById('new-pass').value;
@@ -999,10 +992,13 @@ function changePassword(){
   const msg=document.getElementById('pass-msg');
   if(!np){msg.textContent='Passord kan ikke være tomt.';msg.style.color='#ff6b6b';return;}
   if(np!==np2){msg.textContent='Passordene matcher ikke.';msg.style.color='#ff6b6b';return;}
-  state.credentials.pass=np;save();
-  document.getElementById('new-pass').value='';document.getElementById('new-pass2').value='';
-  msg.textContent='✓ Passord oppdatert!';msg.style.color='var(--success)';
-  setTimeout(()=>msg.textContent='',3000);toast('Passord oppdatert!');
+  auth.currentUser.updatePassword(np)
+    .then(()=>{
+      document.getElementById('new-pass').value='';document.getElementById('new-pass2').value='';
+      msg.textContent='✓ Passord oppdatert!';msg.style.color='var(--success)';
+      setTimeout(()=>msg.textContent='',3000);toast('Passord oppdatert!');
+    })
+    .catch(e=>{msg.textContent='Feil: '+e.message;msg.style.color='#ff6b6b';});
 }
 
 // ===== NAV =====
@@ -1198,7 +1194,7 @@ function confirmReset(type){
   });}
   else if(type==='members'){TEAMS.forEach(t=>state.members[t.id]=[]);}
   else if(type==='exercises'){state.exercises=[];state.scores={};state.tournaments={};}
-  else if(type==='all'){const creds=state.credentials;Object.assign(state,defaultState());state.credentials=creds;}
+  else if(type==='all'){Object.assign(state,defaultState());}
   save();renderAll();toast('Tilbakestilt!','error');
 }
 
@@ -2580,13 +2576,25 @@ function saveRules(exId, val){
 }
 
 
-// Restore admin UI if session is still active
-if(isAdmin){
-  document.getElementById('dictator-btn').style.display='none';
-  document.getElementById('logout-btn').style.display='inline-block';
-  document.getElementById('results-tab').classList.add('visible');
-  document.getElementById('admin-tab').classList.add('visible');
-}
+// Firebase Auth state – single source of truth for admin
+auth.onAuthStateChanged(user => {
+  isAdmin = !!user;
+  if(isAdmin){
+    document.getElementById('dictator-btn').style.display='none';
+    document.getElementById('logout-btn').style.display='inline-block';
+    document.getElementById('results-tab').classList.add('visible');
+    document.getElementById('admin-tab').classList.add('visible');
+    renderAll();
+  } else {
+    document.getElementById('dictator-btn').style.display='inline-block';
+    document.getElementById('logout-btn').style.display='none';
+    document.getElementById('results-tab').classList.remove('visible');
+    document.getElementById('admin-tab').classList.remove('visible');
+    const active = document.querySelector('.section.active');
+    if(active && (active.id==='admin'||active.id==='results')) showSection('dashboard');
+    renderAll();
+  }
+});
 
 // Register service worker for PWA
 if('serviceWorker' in navigator){
