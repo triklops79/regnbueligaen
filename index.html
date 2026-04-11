@@ -2290,6 +2290,7 @@ function renderAxeCupHTML(exId,name,editable){
   }
 
   // PLAYING / DONE
+  if(!ax.rounds||!Array.isArray(ax.rounds)) ax.rounds=[];
   const roundsHTML=ax.rounds.map((round,ri)=>{
     const isCurrentRound=ri===ax.currentRound;
     const isFinalRound=round.some(m=>m.isFinal);
@@ -2360,6 +2361,7 @@ function renderAxeCupHTML(exId,name,editable){
   const standingsHTML=ax.phase==='done'?renderFinalStandings(exId):'';
 
   // Log
+  if(!ax.log||!Array.isArray(ax.log)) ax.log=[];
   const logHTML=ax.log.length?`<div class="phase-label" style="margin-top:1rem;">Logg</div>
     <div class="kd-log">${ax.log.map(e=>`<div class="kd-log-entry"><span style="color:var(--muted);font-size:.75rem;">${e.ts}</span> ${e.text}</div>`).join('')}</div>`:'';
 
