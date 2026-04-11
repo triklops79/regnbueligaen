@@ -679,9 +679,8 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
           <div style="color:var(--muted2);font-size:.88rem;margin-bottom:1rem;">Disse handlingene kan ikke angres!</div>
           <div style="display:flex;gap:.7rem;flex-wrap:wrap;">
             <button class="btn btn-danger" onclick="confirmReset('scores')">Nullstill alle poeng</button>
+            <button class="btn btn-admin" onclick="restoreBackup()">↩ Gjenopprett forrige versjon</button>
             <button class="btn btn-danger" onclick="confirmReset('members')">Fjern alle spillere</button>
-            <button class="btn btn-danger" onclick="confirmReset('exercises')">Slett alle øvelser</button>
-            <button class="btn btn-danger" onclick="confirmReset('all')">Tilbakestill alt</button>
           </div>
         </div>
       </div>
@@ -843,7 +842,26 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const dbRef = db.ref('/');
+const backupRef = db.ref('/_backup');
 const auth = firebase.auth();
+
+function saveBackup(){
+  // Save current state as backup before destructive operations
+  backupRef.set({data: JSON.stringify(state), ts: new Date().toISOString()});
+}
+
+function restoreBackup(){
+  if(!confirm('Gjenopprette forrige versjon? Alle endringer siden da vil gå tapt.')) return;
+  backupRef.once('value').then(snap => {
+    const b = snap.val();
+    if(!b || !b.data){ toast('Ingen backup funnet','error'); return; }
+    const parsed = JSON.parse(b.data);
+    state = parsed;
+    saveToCloud();
+    renderAll();
+    toast('✓ Forrige versjon gjenopprettet!');
+  }).catch(()=>toast('Kunne ikke hente backup','error'));
+}
 
 let state = defaultState();
 let isAdmin = false;
@@ -856,7 +874,7 @@ function migrateState(){
   if(!state.scores) state.scores = {};
   if(!state.members) state.members = {cocky:[],ossia:[],bergen:[],teisen:[]};
   if(!state.pointScheme) state.pointScheme = {1:10,2:6,3:3,4:1};
-  if(!state.program) { state.program = defaultState().program; dirty=true; }
+  if(!state.program || !state.program.days) { state.program = defaultState().program; dirty=true; }
   if(!state.templates) state.templates = [];
   state.exercises.forEach(ex => {
     if(ex.type==='knockout') {
@@ -1216,9 +1234,9 @@ function getExCount(){
 
 // ===== RESET =====
 function confirmReset(type){
-  const msgs={scores:'nullstille alle poeng',members:'fjerne alle spillere',exercises:'SLETTE ALLE ØVELSER',all:'tilbakestille ABSOLUTT ALT'};
-  const warn = type==='exercises'||type==='all' ? '\n\nDETTE KAN IKKE ANGRES!' : '';
-  if(!confirm('Er du sikker på at du vil '+msgs[type]+'?'+warn))return;
+  const msgs={scores:'nullstille alle poeng',members:'fjerne alle spillere'};
+  if(!confirm('Er du sikker på at du vil '+msgs[type]+'?')) return;
+  saveBackup();
   if(type==='scores'){state.exercises.forEach(ex=>{
     state.scores[ex.id]={cocky:0,ossia:0,bergen:0,teisen:0};
     if(ex.type==='tournament') state.tournaments[ex.id]=defaultTournament();
@@ -1844,6 +1862,7 @@ function setKnockoutTeam(exId,round,slot,val){
 
 function resetKnockout(exId){
   if(!confirm('Nullstille trekningen? Kun dette sluttspillet nullstilles, øvelsene beholdes.')) return;
+  saveBackup();
   state.tournaments[exId] = defaultKnockout();
   save(); renderAll(); toast('Trekning nullstilt', 'error');
 }
@@ -1938,6 +1957,7 @@ function kdToggleLife(exId, teamIdx, heartIdx){
 
 function kdResetGame(exId){
   if(!confirm('Nullstille Killer Dart? Kun spillet nullstilles, øvelsene beholdes.')) return;
+  saveBackup();
   state.tournaments[exId] = defaultKillerDart();
   save(); renderAll(); toast('Killer Dart nullstilt', 'error');
 }
@@ -2199,6 +2219,7 @@ function axeRemovePlayer(exId,idx){
 
 function axeReset(exId){
   if(!confirm('Nullstille øksekast-cupen? Kun cupen nullstilles, øvelsene beholdes.')) return;
+  saveBackup();
   const old=state.tournaments[exId];
   state.tournaments[exId]=defaultAxeCup();
   save();renderAll();toast('Cup nullstilt','error');
@@ -2515,6 +2536,7 @@ function progAddDay(){
 }
 function progDeleteDay(dayId){
   if(!confirm('Slette denne dagen?')) return;
+  saveBackup();
   state.program.days=state.program.days.filter(d=>d.id!==dayId);
   save(); renderProgram();
 }
