@@ -983,7 +983,7 @@ function defaultKillerDart(){
     phase: 'setup', // setup | playing | done
     teams: TEAMS.map((t,i)=>({
       id: t.id,
-      lives: 3,
+      lives: 4,
     })),
     log: [],  // [{text, ts}]
     winner: null // team id
@@ -1963,7 +1963,7 @@ function renderKillerDartHTML(exId, name, editable){
   if(!kd) return '';
 
   // Ensure arrays are arrays (Firebase converts them to objects)
-  if(!kd.teams || !Array.isArray(kd.teams)) kd.teams = kd.teams ? Object.values(kd.teams) : TEAMS.map(t=>({id:t.id,lives:3}));
+  if(!kd.teams || !Array.isArray(kd.teams)) kd.teams = kd.teams ? Object.values(kd.teams) : TEAMS.map(t=>({id:t.id,lives:4}));
   if(!kd.log || !Array.isArray(kd.log)) kd.log = kd.log ? Object.values(kd.log) : [];
 
   // Setup phase
