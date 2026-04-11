@@ -2099,6 +2099,9 @@ function axeBuildRound(players){
 
 function axeStartCup(exId){
   const ax=state.tournaments[exId];
+  if(!ax.players||!Array.isArray(ax.players)) ax.players=[];
+  if(!ax.log||!Array.isArray(ax.log)) ax.log=[];
+  if(!ax.rounds||!Array.isArray(ax.rounds)) ax.rounds=[];
   if(ax.players.length<2){toast('Legg til minst 2 spillere!','error');return;}
   ax.rounds=[axeBuildRound(ax.players)];
   ax.currentRound=0;
