@@ -897,33 +897,36 @@ function loadFromCloud(){
     console.log('Firebase data received:', JSON.stringify(data).substring(0, 200));
     console.log('exercises type:', data ? typeof data.exercises : 'no data');
     console.log('exercises isArray:', data ? Array.isArray(data.exercises) : 'no data');
-    if(data) {
+    if(data && data.exercises) {
       // Firebase converts ALL arrays to objects with numeric keys.
       // Fix recursively before doing anything else.
       function fixArrays(obj) {
         if(!obj || typeof obj !== 'object') return obj;
         if(Array.isArray(obj)) {
-          obj.forEach(fixArrays);
+          obj.forEach((item,i) => { obj[i] = fixArrays(item); });
           return obj;
         }
-        // Check if this object looks like a Firebase-converted array
-        // (all keys are numeric strings: "0", "1", "2", ...)
         const keys = Object.keys(obj);
         const isNumeric = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
         if(isNumeric) {
-          const arr = keys.sort((a,b)=>Number(a)-Number(b)).map(k => fixArrays(obj[k]));
-          return arr;
+          return keys.sort((a,b)=>Number(a)-Number(b)).map(k => fixArrays(obj[k]));
         }
-        // Regular object - recurse into values
         keys.forEach(k => { obj[k] = fixArrays(obj[k]); });
         return obj;
       }
-      const fixed = fixArrays(data);
+      // Deep clone to avoid mutating Firebase's cached object
+      const fixed = fixArrays(JSON.parse(JSON.stringify(data)));
+      // Ignore _backup node
+      delete fixed._backup;
       state = fixed;
-      migrateState();
-    } else {
-      state = defaultState();
-      saveToCloud();
+      const dirty = migrateState();
+      if(dirty) saveToCloud();
+    } else if(!data || !data.exercises) {
+      // Only write defaults if truly empty
+      if(!data) {
+        state = defaultState();
+        saveToCloud();
+      }
     }
     hideSyncStatus();
     renderAll();
