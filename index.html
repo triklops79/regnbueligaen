@@ -880,7 +880,14 @@ function loadFromCloud(){
   showSyncStatus('loading');
   dbRef.on('value', snapshot => {
     const data = snapshot.val();
-    if(data && Array.isArray(data.exercises)) {
+    if(data && (Array.isArray(data.exercises) || (data.exercises && typeof data.exercises === 'object'))) {
+      // Firebase may convert arrays to objects with numeric keys - convert back
+      if(data.exercises && !Array.isArray(data.exercises)) {
+        data.exercises = Object.values(data.exercises);
+      }
+      if(data.templates && !Array.isArray(data.templates)) {
+        data.templates = Object.values(data.templates);
+      }
       state = data;
       migrateState();
     } else if(!data) {
@@ -1192,8 +1199,9 @@ function getExCount(){
 
 // ===== RESET =====
 function confirmReset(type){
-  const msgs={scores:'nullstille alle poeng',members:'fjerne alle spillere',exercises:'slette alle øvelser',all:'tilbakestille absolutt alt'};
-  if(!confirm('Er du sikker på at du vil '+msgs[type]+'?'))return;
+  const msgs={scores:'nullstille alle poeng',members:'fjerne alle spillere',exercises:'SLETTE ALLE ØVELSER',all:'tilbakestille ABSOLUTT ALT'};
+  const warn = type==='exercises'||type==='all' ? '\n\nDETTE KAN IKKE ANGRES!' : '';
+  if(!confirm('Er du sikker på at du vil '+msgs[type]+'?'+warn))return;
   if(type==='scores'){state.exercises.forEach(ex=>{
     state.scores[ex.id]={cocky:0,ossia:0,bergen:0,teisen:0};
     if(ex.type==='tournament') state.tournaments[ex.id]=defaultTournament();
@@ -1818,7 +1826,7 @@ function setKnockoutTeam(exId,round,slot,val){
 }
 
 function resetKnockout(exId){
-  if(!confirm('Tilbakestille trekningen? Alle resultater i dette sluttspillet slettes.')) return;
+  if(!confirm('Nullstille trekningen? Kun dette sluttspillet nullstilles, øvelsene beholdes.')) return;
   state.tournaments[exId] = defaultKnockout();
   save(); renderAll(); toast('Trekning nullstilt', 'error');
 }
@@ -1912,7 +1920,7 @@ function kdToggleLife(exId, teamIdx, heartIdx){
 }
 
 function kdResetGame(exId){
-  if(!confirm('Tilbakestille Killer Dart-spillet?')) return;
+  if(!confirm('Nullstille Killer Dart? Kun spillet nullstilles, øvelsene beholdes.')) return;
   state.tournaments[exId] = defaultKillerDart();
   save(); renderAll(); toast('Killer Dart nullstilt', 'error');
 }
@@ -2170,7 +2178,7 @@ function axeRemovePlayer(exId,idx){
 }
 
 function axeReset(exId){
-  if(!confirm('Tilbakestille øksekast-cupen?')) return;
+  if(!confirm('Nullstille øksekast-cupen? Kun cupen nullstilles, øvelsene beholdes.')) return;
   const old=state.tournaments[exId];
   state.tournaments[exId]=defaultAxeCup();
   save();renderAll();toast('Cup nullstilt','error');
