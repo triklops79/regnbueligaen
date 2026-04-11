@@ -880,17 +880,19 @@ function loadFromCloud(){
   showSyncStatus('loading');
   dbRef.on('value', snapshot => {
     const data = snapshot.val();
-    if(data && (Array.isArray(data.exercises) || (data.exercises && typeof data.exercises === 'object'))) {
-      // Firebase may convert arrays to objects with numeric keys - convert back
-      if(data.exercises && !Array.isArray(data.exercises)) {
-        data.exercises = Object.values(data.exercises);
-      }
-      if(data.templates && !Array.isArray(data.templates)) {
-        data.templates = Object.values(data.templates);
-      }
+    console.log('Firebase data received:', JSON.stringify(data).substring(0, 200));
+    console.log('exercises type:', data ? typeof data.exercises : 'no data');
+    console.log('exercises isArray:', data ? Array.isArray(data.exercises) : 'no data');
+    if(data) {
+      // Convert any Firebase object-arrays back to real arrays
+      ['exercises','templates'].forEach(key => {
+        if(data[key] && !Array.isArray(data[key])) {
+          data[key] = Object.values(data[key]);
+        }
+      });
       state = data;
       migrateState();
-    } else if(!data) {
+    } else {
       state = defaultState();
       saveToCloud();
     }
