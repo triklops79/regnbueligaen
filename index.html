@@ -740,7 +740,7 @@ const firebaseConfig = {
 // Firebase init
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-const dbRef = db.ref('state');
+const dbRef = db.ref('/');
 
 let state = defaultState();
 let isAdmin = sessionStorage.getItem('rbl_admin') === '1';
