@@ -34,6 +34,26 @@ nav{display:flex;gap:.25rem;}
 nav button{background:none;border:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:700;letter-spacing:1px;padding:.4rem .85rem;border-radius:8px;cursor:pointer;text-transform:uppercase;transition:.2s;}
 nav button:hover{color:var(--text);background:var(--surface2);}
 nav button.active{color:#fff;background:var(--surface2);border:1px solid var(--border2);}
+
+/* INSTALL MODAL */
+.install-overlay{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:.25s;}
+.install-overlay.open{opacity:1;pointer-events:all;}
+.install-box{background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:2rem 2.2rem;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 40px 80px rgba(0,0,0,.7);transform:translateY(20px);transition:.25s;position:relative;}
+.install-overlay.open .install-box{transform:translateY(0);}
+.install-tabs{display:flex;gap:.5rem;margin-bottom:1.5rem;border-bottom:1px solid var(--border);}
+.install-tab{background:none;border:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;letter-spacing:1px;padding:.5rem 1rem;cursor:pointer;text-transform:uppercase;border-bottom:3px solid transparent;margin-bottom:-1px;transition:.2s;}
+.install-tab.active{color:var(--text);border-bottom-color:var(--text);}
+.install-content{display:none;} .install-content.active{display:block;}
+.install-step{display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.2rem;}
+.install-step-num{font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--admin);line-height:1;min-width:32px;}
+.install-step-text{font-family:'Barlow',sans-serif;font-size:.95rem;color:var(--muted2);line-height:1.5;padding-top:.25rem;}
+.install-step-text strong{color:var(--text);}
+.install-icon-row{display:flex;align-items:center;gap:.5rem;margin:.4rem 0;background:var(--surface2);border-radius:8px;padding:.5rem .8rem;font-size:.9rem;}
+.install-title{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:3px;margin-bottom:.3rem;}
+.install-sub{font-family:'Barlow Condensed',sans-serif;font-size:.85rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:1.5rem;}
+.btn-install-trigger{background:none;border:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.5px;padding:.3rem .5rem;border-radius:6px;cursor:pointer;opacity:.5;transition:.3s;white-space:nowrap;}
+.btn-install-trigger:hover{opacity:1;color:var(--text);}
+
 .btn-dictator{background:none;border:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.7rem;font-weight:600;padding:.3rem .5rem;border-radius:6px;cursor:pointer;opacity:.35;transition:.3s;white-space:nowrap;}
 .btn-dictator:hover{opacity:1;color:var(--admin);}
 .btn-logout{background:none;border:1px solid rgba(167,139,250,.3);color:var(--admin);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.82rem;letter-spacing:1px;padding:.35rem .75rem;border-radius:8px;cursor:pointer;text-transform:uppercase;transition:.2s;}
@@ -511,6 +531,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
       <button id="admin-tab" onclick="showSection('admin')">⚙ Admin</button>
     </nav>
     <span id="sync-status" style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;letter-spacing:1px;color:var(--muted);opacity:0;transition:.5s;"></span>
+    <button class="btn-install-trigger" onclick="openInstallModal()">📲 Installer appen</button>
     <button class="btn-dictator" id="dictator-btn" onclick="openLoginModal()">Login for diktatorer</button>
     <button class="btn-logout" id="logout-btn" style="display:none;" onclick="doLogout()">Logg ut</button>
   </div>
@@ -664,6 +685,77 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
     <div class="rules-box-title" id="rules-modal-title"></div>
     <div class="rules-box-type" id="rules-modal-type"></div>
     <div id="rules-modal-body"></div>
+  </div>
+</div>
+
+<!-- INSTALL MODAL -->
+<div class="install-overlay" id="install-modal" onclick="handleInstallClick(event)">
+  <div class="install-box">
+    <button class="modal-close" onclick="closeInstallModal()">✕</button>
+    <div class="install-title">🏳️‍🌈 Installer appen</div>
+    <div class="install-sub">Legg Regnbueligaen på hjemskjermen</div>
+    <div class="install-tabs">
+      <button class="install-tab active" onclick="switchInstallTab('android')">🤖 Android</button>
+      <button class="install-tab" onclick="switchInstallTab('ios')">🍎 iPhone</button>
+    </div>
+
+    <!-- ANDROID -->
+    <div class="install-content active" id="install-android">
+      <div class="install-step">
+        <div class="install-step-num">1</div>
+        <div class="install-step-text">Åpne <strong>regnbueligaen.com</strong> i <strong>Google Chrome</strong></div>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">2</div>
+        <div class="install-step-text">
+          Trykk på de <strong>tre prikkene</strong> øverst til høyre i Chrome
+          <div class="install-icon-row">⋮ <span style="color:var(--muted);">Meny-knapp øverst til høyre</span></div>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">3</div>
+        <div class="install-step-text">
+          Trykk på <strong>«Legg til på startskjerm»</strong>
+          <div class="install-icon-row">📲 <span style="color:var(--muted);">Legg til på startskjerm</span></div>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">4</div>
+        <div class="install-step-text">Trykk <strong>«Legg til»</strong> i dialogen som dukker opp – ferdig! 🎉</div>
+      </div>
+      <div style="background:rgba(105,240,174,.08);border:1px solid rgba(105,240,174,.2);border-radius:10px;padding:.8rem 1rem;font-family:'Barlow Condensed',sans-serif;font-size:.88rem;color:var(--teisen);margin-top:.5rem;">
+        💡 Chrome kan også vise en automatisk banner nederst på skjermen – trykk bare på den!
+      </div>
+    </div>
+
+    <!-- iOS -->
+    <div class="install-content" id="install-ios">
+      <div class="install-step">
+        <div class="install-step-num">1</div>
+        <div class="install-step-text">Åpne <strong>regnbueligaen.com</strong> i <strong>Safari</strong> (ikke Chrome – må være Safari!)</div>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">2</div>
+        <div class="install-step-text">
+          Trykk på <strong>del-ikonet</strong> nederst i midten av skjermen
+          <div class="install-icon-row">⬆️ <span style="color:var(--muted);">Firkant med pil opp – nederst i Safari</span></div>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">3</div>
+        <div class="install-step-text">
+          Scroll ned i menyen og trykk <strong>«Legg til på hjem-skjerm»</strong>
+          <div class="install-icon-row">➕ <span style="color:var(--muted);">Legg til på hjem-skjerm</span></div>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">4</div>
+        <div class="install-step-text">Trykk <strong>«Legg til»</strong> øverst til høyre – ferdig! 🎉</div>
+      </div>
+      <div style="background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.2);border-radius:10px;padding:.8rem 1rem;font-family:'Barlow Condensed',sans-serif;font-size:.88rem;color:var(--bergen);margin-top:.5rem;">
+        💡 Må åpnes i Safari – fungerer ikke fra Chrome eller andre nettlesere på iPhone.
+      </div>
+    </div>
   </div>
 </div>
 </main>
@@ -2434,6 +2526,23 @@ function renderTemplates(){
       </div>
     </div>`).join('')}
   </div>`;
+}
+
+
+// ===== INSTALL MODAL =====
+function openInstallModal(){
+  document.getElementById('install-modal').classList.add('open');
+  // Auto-detect platform and show relevant tab
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if(isIOS) switchInstallTab('ios');
+  else switchInstallTab('android');
+}
+function closeInstallModal(){document.getElementById('install-modal').classList.remove('open');}
+function handleInstallClick(e){if(e.target===document.getElementById('install-modal'))closeInstallModal();}
+function switchInstallTab(tab){
+  document.querySelectorAll('.install-tab').forEach((t,i)=>t.classList.toggle('active',['android','ios'][i]===tab));
+  document.getElementById('install-android').classList.toggle('active',tab==='android');
+  document.getElementById('install-ios').classList.toggle('active',tab==='ios');
 }
 
 // ===== RULES MODAL =====
