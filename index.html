@@ -31,6 +31,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .header-inner{max-width:1200px;width:100%;margin:0 auto;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;}
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:0;display:flex;align-items:center;justify-content:center;height:66px;position:sticky;top:0;z-index:100;box-shadow:0 4px 30px rgba(0,0,0,.5);}
 .logo{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;cursor:pointer;user-select:none;}
+.logo-text{flex:1 1 auto;}
 .header-right{display:flex;align-items:center;gap:.4rem;}
 nav{display:flex;gap:.25rem;}
 nav button{background:none;border:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:700;letter-spacing:1px;padding:.4rem .85rem;border-radius:8px;cursor:pointer;text-transform:uppercase;transition:.2s;}
@@ -415,7 +416,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
   header{padding:.5rem 0;height:auto;flex-wrap:wrap;gap:.25rem;}
   .header-inner{flex-direction:column;padding:0;gap:.25rem;align-items:flex-start;width:100%;max-width:none;}
   .logo{width:100%;font-size:14.5vw;letter-spacing:0;padding:0 .35rem;box-sizing:border-box;}
-  .logo span{top:-0.08em;margin-left:auto;}
+  .logo-text{flex:1 1 auto;text-align:right;top:-0.08em;}
   .header-right{width:100%;display:flex;flex-direction:column;gap:.25rem;}
   nav{display:flex;width:100%;gap:0;padding:0 .75rem;box-sizing:border-box;}
   nav button{flex:1;font-size:1.05rem;padding:.5rem .2rem;letter-spacing:.5px;text-align:center;}
@@ -527,7 +528,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
         <rect width="28" height="3" y="12" fill="#004DFF"/>
         <rect width="28" height="3" y="15" fill="#750787"/>
       </svg>
-      <span style="flex:1 1 auto;white-space:nowrap;min-width:0;background:linear-gradient(90deg,#f5a623,#e84393,#4fc3f7,#69f0ae);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:inherit;line-height:1;text-align:right;position:relative;top:-0.08em;">Regnbueligaen</span></div>
+      <span class="logo-text" style="white-space:nowrap;min-width:0;background:linear-gradient(90deg,#f5a623,#e84393,#4fc3f7,#69f0ae);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:inherit;line-height:1;position:relative;top:-0.08em;">Regnbueligaen</span></div>
   <div class="header-right">
     <nav>
       <button class="active" onclick="showSection('dashboard')">Tabell</button>
