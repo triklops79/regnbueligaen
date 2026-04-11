@@ -2228,9 +2228,11 @@ function renderAxeCupHTML(exId,name,editable){
 
   // SETUP PHASE – auto-populate all members
   if(ax.phase==='setup'){
+    // Ensure players is always an array
+    if(!ax.players || !Array.isArray(ax.players)) ax.players=[];
     // Always sync players from current members list
     const allMembers=[];
-    TEAMS.forEach(t=>state.members[t.id].forEach(m=>allMembers.push({name:m,teamId:t.id})));
+    TEAMS.forEach(t=>{if(Array.isArray(state.members[t.id]))state.members[t.id].forEach(m=>allMembers.push({name:m,teamId:t.id}));});
     // Add any members not yet in players list
     allMembers.forEach(m=>{
       if(!ax.players.find(p=>p.name===m.name&&p.teamId===m.teamId)){
