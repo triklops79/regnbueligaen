@@ -11,6 +11,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Regnbueligaen">
 <link rel="manifest" href="manifest.json">
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -724,18 +726,26 @@ function defaultState(){
     }
   };
 }
-const BIN_ID = '69c46c9bb7ec241ddca31576';
-const API_KEY = '$2a$10$Wvfqsnin8.7Qfhhoqyj7heP1teDmLidVe6ji5oOTrBmQ2owubnGG2';
-const BIN_URL = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyDeFtrijdMORqKDkpSlpQVJkhozE1I7MQc",
+  authDomain: "regnbueligaen-9af26.firebaseapp.com",
+  databaseURL: "https://regnbueligaen-9af26-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "regnbueligaen-9af26",
+  storageBucket: "regnbueligaen-9af26.firebasestorage.app",
+  messagingSenderId: "697058150930",
+  appId: "1:697058150930:web:c9cfe0b7d5c3258551e6cb"
+};
+
+// Firebase init
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const dbRef = db.ref('state');
 
 let state = defaultState();
 let isAdmin = sessionStorage.getItem('rbl_admin') === '1';
 let saveTimer = null;
 
-let isSaving = false;
-let lastSavedJSON = '';
-
-// Migrate state after load
 function migrateState(){
   let dirty = false;
   if(!state.exercises) state.exercises = [];
@@ -745,17 +755,17 @@ function migrateState(){
   if(!state.pointScheme) state.pointScheme = {1:10,2:6,3:3,4:1};
   if(!state.credentials) state.credentials = {user:'admin',pass:'regnbue2025'};
   if(!state.program) { state.program = defaultState().program; dirty=true; }
+  if(!state.templates) state.templates = [];
   state.exercises.forEach(ex => {
     if(ex.type==='knockout') {
       const t = state.tournaments[ex.id];
       if(!t) { state.tournaments[ex.id]=defaultKnockout(); dirty=true; }
       else if(t.phase==='group') { t.phase='setup'; dirty=true; }
     }
-    if(!state.tournaments[ex.id] && (ex.type==='tournament'||ex.type==='knockout'||ex.type==='killerdart')) {
+    if(!state.tournaments[ex.id] && (ex.type==='tournament'||ex.type==='knockout'||ex.type==='killerdart'||ex.type==='axecup')) {
       if(ex.type==='tournament') state.tournaments[ex.id]=defaultTournament();
       else if(ex.type==='knockout') state.tournaments[ex.id]=defaultKnockout();
       else if(ex.type==='killerdart') state.tournaments[ex.id]=defaultKillerDart();
-    else if(ex.type==='axecup') state.tournaments[ex.id]=defaultAxeCup();
       else if(ex.type==='axecup') state.tournaments[ex.id]=defaultAxeCup();
       dirty=true;
     }
@@ -763,84 +773,39 @@ function migrateState(){
   return dirty;
 }
 
-async function loadFromCloud(){
+// Load from Firebase + listen for realtime updates
+function loadFromCloud(){
   showSyncStatus('loading');
-  try {
-    const res = await fetch(BIN_URL + '/latest', {
-      headers: { 'X-Access-Key': API_KEY }
-    });
-    const data = await res.json();
-    const rec = data.record;
-    if(rec && Array.isArray(rec.exercises)) {
-      // Cloud has real data – use it
-      state = rec;
-      lastSavedJSON = JSON.stringify(state);
-      const dirty = migrateState();
-      if(dirty) await saveToCloud();
-    } else {
-      // Cloud is empty or uninitialized – push default state up
+  dbRef.on('value', snapshot => {
+    const data = snapshot.val();
+    if(data && Array.isArray(data.exercises)) {
+      state = data;
+      migrateState();
+    } else if(!data) {
       state = defaultState();
-      await saveToCloud();
+      saveToCloud();
     }
-  } catch(e) {
-    console.error('Load failed:', e);
+    hideSyncStatus();
+    renderAll();
+  }, err => {
+    console.error('Firebase error:', err);
     showSyncStatus('error');
     state = defaultState();
-  }
-  hideSyncStatus();
-  renderAll();
+    renderAll();
+  });
 }
 
-// Poll for changes every 5 seconds (for non-admin viewers)
-async function pollCloud(){
-  if(isSaving) return;
-  try {
-    const res = await fetch(BIN_URL + '/latest', {
-      headers: { 'X-Access-Key': API_KEY }
-    });
-    const data = await res.json();
-    if(data.record && data.record.exercises !== undefined) {
-      const incoming = JSON.stringify(data.record);
-      if(incoming !== lastSavedJSON) {
-        state = data.record;
-        lastSavedJSON = incoming;
-        migrateState();
-        renderAll();
-        hideSyncStatus();
-      }
-    }
-  } catch(e) { /* silent fail on poll */ }
-}
-setInterval(pollCloud, 5000);
-
-// Debounced save – 1.5s delay to batch rapid changes
+// Debounced save – 1s
 function save(){
   if(saveTimer) clearTimeout(saveTimer);
   showSyncStatus('saving');
-  saveTimer = setTimeout(saveToCloud, 1500);
+  saveTimer = setTimeout(saveToCloud, 1000);
 }
 
-async function saveToCloud(){
-  if(isSaving) { saveTimer = setTimeout(saveToCloud, 500); return; }
-  isSaving = true;
-  try {
-    const body = JSON.stringify(state);
-    const res = await fetch(BIN_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Access-Key': API_KEY },
-      body
-    });
-    if(res.ok) {
-      lastSavedJSON = body;
-      hideSyncStatus();
-    } else {
-      showSyncStatus('error');
-    }
-  } catch(e) {
-    showSyncStatus('error');
-    console.error('Save failed:', e);
-  }
-  isSaving = false;
+function saveToCloud(){
+  dbRef.set(state)
+    .then(() => hideSyncStatus())
+    .catch(e => { showSyncStatus('error'); console.error('Save failed:', e); });
 }
 
 function showSyncStatus(type){
