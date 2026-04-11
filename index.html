@@ -28,7 +28,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 
 /* HEADER */
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:66px;position:sticky;top:0;z-index:100;box-shadow:0 4px 30px rgba(0,0,0,.5);}
-.logo{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;background:linear-gradient(90deg,#f5a623,#e84393,#4fc3f7,#69f0ae);-webkit-background-clip:text;-webkit-text-fill-color:transparent;cursor:pointer;user-select:none;}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;cursor:pointer;user-select:none;}
 .header-right{display:flex;align-items:center;gap:.4rem;}
 nav{display:flex;gap:.25rem;}
 nav button{background:none;border:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:700;letter-spacing:1px;padding:.4rem .85rem;border-radius:8px;cursor:pointer;text-transform:uppercase;transition:.2s;}
@@ -523,7 +523,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
         <rect width="28" height="3" y="12" fill="#004DFF"/>
         <rect width="28" height="3" y="15" fill="#750787"/>
       </svg>
-      <span style="flex:1;white-space:nowrap;">Regnbueligaen</span></div>
+      <span style="flex:1 1 auto;white-space:nowrap;min-width:0;background:linear-gradient(90deg,#f5a623,#e84393,#4fc3f7,#69f0ae);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:inherit;line-height:1;">Regnbueligaen</span></div>
   <div class="header-right">
     <nav>
       <button class="active" onclick="showSection('dashboard')">Tabell</button>
