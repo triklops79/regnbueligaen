@@ -125,6 +125,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 .tc-label{font-family:'Barlow Condensed',sans-serif;font-size:.78rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
 .divider{height:1px;background:var(--border);margin:.9rem 0;}
 .chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem;}
+.chip-captain{border-color:var(--gold)!important;color:var(--gold)!important;}
 .chip{background:var(--surface2);border:1px solid var(--border2);border-radius:20px;padding:.18rem .65rem;font-size:.85rem;}
 
 /* EXERCISE */
@@ -786,6 +787,7 @@ function defaultState(){
     tournaments:{},  // tournament data per exercise id
     pointScheme:{1:10,2:6,3:3,4:1},
     templates:[],
+    captains:{cocky:null,ossia:null,bergen:null,teisen:null},
     program:{
       title:'Malahide',
       subtitle:'21–25 mai 2026',
@@ -879,6 +881,7 @@ function migrateState(){
   }
   if(!state.program || !state.program.days) { state.program = defaultState().program; dirty=true; }
   if(!state.templates) state.templates = [];
+  if(!state.captains) state.captains = {cocky:null,ossia:null,bergen:null,teisen:null};
   state.exercises.forEach(ex => {
     if(ex.type==='knockout') {
       const t = state.tournaments[ex.id];
@@ -1413,7 +1416,8 @@ function renderTeams(){
       <div class="tc-pts ${t.tc}">${totals[t.id]} <span style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;color:var(--muted);">pts</span></div>
       <div class="divider"></div>
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:.76rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem;">Spillere (${state.members[t.id].length})</div>
-      <div class="chips">${state.members[t.id].length===0?'<span style="color:var(--muted);font-size:.85rem;">Ingen spillere ennå</span>':state.members[t.id].map(m=>`<div class="chip">${m}</div>`).join('')}</div>
+      ${state.captains&&state.captains[t.id]?`<div style="font-family:'Barlow Condensed',sans-serif;font-size:.78rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem;">Kaptein</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;margin-bottom:.6rem;"><span class="${t.tc}">⭐ ${state.captains[t.id]}</span></div>`:''}
+      <div class="chips">${state.members[t.id].length===0?'<span style="color:var(--muted);font-size:.85rem;">Ingen spillere ennå</span>':state.members[t.id].map(m=>`<div class="chip${state.captains&&state.captains[t.id]===m?' chip-captain':''}">${state.captains&&state.captains[t.id]===m?'⭐ ':''}${m}</div>`).join('')}</div>
     </div>`).join('');
 }
 
@@ -1700,7 +1704,16 @@ function renderAdmin(){
     <div style="margin-bottom:1.1rem;">
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.88rem;letter-spacing:1px;text-transform:uppercase;margin-bottom:.35rem;color:${t.color}">${t.name}</div>
       ${!state.members[t.id].length?'<div style="color:var(--muted);font-size:.85rem;padding:.2rem .5rem;">Ingen spillere</div>':
-        state.members[t.id].map((m,i)=>`<div class="member-admin"><span class="member-admin-name">${m}</span><button class="btn btn-danger btn-sm" onclick="removeMember('${t.id}',${i})">Fjern</button></div>`).join('')}
+        state.members[t.id].map((m,i)=>`<div class="member-admin">
+          <span class="member-admin-name">${state.captains&&state.captains[t.id]===m?'⭐ ':''}${m}</span>
+          <div style="display:flex;gap:.4rem;">
+            ${state.captains&&state.captains[t.id]===m
+              ? `<button class="btn btn-sm" style="background:rgba(255,215,0,.15);color:var(--gold);border-color:var(--gold);" onclick="setCaptain('${t.id}',null)">Fjern kaptein</button>`
+              : `<button class="btn btn-admin btn-sm" onclick="setCaptain('${t.id}','${m.replace(/'/g,"\\'")}')">Sett kaptein</button>`
+            }
+            <button class="btn btn-danger btn-sm" onclick="removeMember('${t.id}',${i})">Fjern</button>
+          </div>
+        </div>`).join('')}
     </div>`).join('');
 }
 
@@ -2566,6 +2579,13 @@ function resetExerciseScores(exId){
   saveBackup();
   state.scores[exId]={cocky:0,ossia:0,bergen:0,teisen:0};
   save();renderDashboard();renderResults();toast('Poeng nullstilt');
+}
+
+
+function setCaptain(teamId, name){
+  if(!state.captains) state.captains = {cocky:null,ossia:null,bergen:null,teisen:null};
+  state.captains[teamId] = name;
+  save(); renderTeams(); renderAdmin();
 }
 
 // ===== TEMPLATE LIBRARY =====
