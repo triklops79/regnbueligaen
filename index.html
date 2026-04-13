@@ -1416,7 +1416,6 @@ function renderTeams(){
       <div class="tc-pts ${t.tc}">${totals[t.id]} <span style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;color:var(--muted);">pts</span></div>
       <div class="divider"></div>
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:.76rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem;">Spillere (${state.members[t.id].length})</div>
-      ${state.captains&&state.captains[t.id]?`<div style="font-family:'Barlow Condensed',sans-serif;font-size:.78rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem;">Kaptein</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;margin-bottom:.6rem;"><span class="${t.tc}">⭐ ${state.captains[t.id]}</span></div>`:''}
       <div class="chips">${state.members[t.id].length===0?'<span style="color:var(--muted);font-size:.85rem;">Ingen spillere ennå</span>':state.members[t.id].map(m=>`<div class="chip${state.captains&&state.captains[t.id]===m?' chip-captain':''}">${state.captains&&state.captains[t.id]===m?'⭐ ':''}${m}</div>`).join('')}</div>
     </div>`).join('');
 }
