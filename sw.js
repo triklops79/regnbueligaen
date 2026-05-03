@@ -1,7 +1,8 @@
-const CACHE = 'regnbueligaen-v1';
+const CACHE = 'regnbueligaen-v2';
 const ASSETS = [
   '/',
   '/index.html',
+  '/logo.png',
   'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap'
 ];
 
