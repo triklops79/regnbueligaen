@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>Regnbueligaen</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='10.67' y='0' fill='%23E40303'/><rect width='64' height='10.67' y='10.67' fill='%23FF8C00'/><rect width='64' height='10.67' y='21.33' fill='%23FFED00'/><rect width='64' height='10.67' y='32' fill='%2300811F'/><rect width='64' height='10.67' y='42.67' fill='%23004DFF'/><rect width='64' height='10.67' y='53.33' fill='%23750787'/></svg>">
 <meta name="theme-color" content="#0b0c10">
@@ -24,6 +25,22 @@
   --gold:#ffd700;--silver:#c0c0c0;--bronze:#cd7f32;
   --admin:#a78bfa;--danger:#ff4d4d;--success:#4ade80;
 }
+/* SITE GATE — blokkerer hele appen til passord er tastet */
+body.gate-locked > *:not(#site-gate){display:none!important;}
+body.gate-locked{overflow:hidden;}
+#site-gate{position:fixed;inset:0;z-index:99999;background:var(--bg);display:none;align-items:center;justify-content:center;padding:1.5rem;}
+body.gate-locked #site-gate{display:flex;}
+.gate-box{width:100%;max-width:380px;text-align:center;}
+.gate-flag{display:inline-block;border-radius:4px;overflow:hidden;margin-bottom:1.2rem;}
+.gate-title{font-family:'Bebas Neue',sans-serif;font-size:2.5rem;letter-spacing:6px;line-height:1;background:linear-gradient(90deg,#E40303,#FF8C00,#FFED00,#008026,#004DFF,#750787);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.4rem;}
+.gate-sub{font-family:'Barlow Condensed',sans-serif;font-size:.9rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);margin-bottom:2rem;}
+.gate-input{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Barlow',sans-serif;font-size:1rem;padding:.9rem 1rem;border-radius:8px;outline:none;text-align:center;letter-spacing:1px;}
+.gate-input:focus{border-color:var(--admin);}
+.gate-input.shake{animation:gateShake .4s;}
+@keyframes gateShake{0%,100%{transform:translateX(0);}25%{transform:translateX(-8px);}75%{transform:translateX(8px);}}
+.gate-error{color:var(--danger);font-size:.85rem;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase;margin-top:.6rem;height:1rem;}
+.gate-btn{margin-top:1rem;width:100%;background:linear-gradient(90deg,#E40303,#FF8C00,#FFED00,#008026,#004DFF,#750787);color:#fff;border:none;font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:3px;padding:.9rem;border-radius:8px;cursor:pointer;text-shadow:0 1px 2px rgba(0,0,0,.5);}
+.gate-btn:active{opacity:.8;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;overflow-x:hidden;}
 
@@ -509,6 +526,62 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 </style>
 </head>
 <body>
+<script>
+  // SITE GATE — kjøres umiddelbart så innhold aldri flasher synlig
+  (function(){
+    if(localStorage.getItem('gateUnlocked') === '1') return;
+    document.body.classList.add('gate-locked');
+  })();
+</script>
+
+<!-- SITE GATE — passord-popup for hele appen -->
+<div id="site-gate">
+  <div class="gate-box">
+    <div class="gate-flag">
+      <svg width="60" height="40" viewBox="0 0 24 16" xmlns="http://www.w3.org/2000/svg">
+        <rect width="24" height="2.67" y="0" fill="#E40303"/>
+        <rect width="24" height="2.67" y="2.67" fill="#FF8C00"/>
+        <rect width="24" height="2.67" y="5.33" fill="#FFED00"/>
+        <rect width="24" height="2.67" y="8" fill="#008026"/>
+        <rect width="24" height="2.67" y="10.67" fill="#004DFF"/>
+        <rect width="24" height="2.67" y="13.33" fill="#750787"/>
+      </svg>
+    </div>
+    <div class="gate-title">REGNBUELIGAEN</div>
+    <div class="gate-sub">Privat — passord kreves</div>
+    <input type="password" id="gate-input" class="gate-input" placeholder="Passord" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="gate-error" id="gate-error"></div>
+    <button class="gate-btn" onclick="checkGate()">SLIPP MEG INN</button>
+  </div>
+</div>
+
+<script>
+  function checkGate(){
+    var input = document.getElementById('gate-input');
+    var err = document.getElementById('gate-error');
+    if(input.value === 'sjukosatan666'){
+      localStorage.setItem('gateUnlocked','1');
+      document.body.classList.remove('gate-locked');
+    } else {
+      err.textContent = 'Feil passord';
+      input.classList.add('shake');
+      setTimeout(function(){ input.classList.remove('shake'); }, 400);
+      input.value = '';
+      input.focus();
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    var inp = document.getElementById('gate-input');
+    if(inp){
+      inp.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); checkGate(); }
+      });
+      if(document.body.classList.contains('gate-locked')){
+        setTimeout(function(){ inp.focus(); }, 100);
+      }
+    }
+  });
+</script>
 
 <!-- LOGIN MODAL -->
 <div class="modal-overlay" id="login-modal" onclick="handleModalClick(event)">
