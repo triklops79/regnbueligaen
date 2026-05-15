@@ -714,6 +714,7 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
               <select id="admin-ex-type">
                 <option value="ranking">Rangering (auto-poeng)</option>
                 <option value="points">Poeng (manuelt)</option>
+                <option value="rawpoints">Rå-poeng → rangering (auto-poeng)</option>
                 <option value="tournament">Turnering (gruppespill + sluttspill)</option>
                 <option value="knockout">Sluttspill (semi-, bronse- og finale)</option>
                 <option value="killerdart">Killer Dart (liv-system)</option>
@@ -865,6 +866,7 @@ function defaultState(){
     members:{cocky:[],ossia:[],bergen:[],teisen:[]},
     exercises:[],
     scores:{},       // non-tournament scores
+    rawScores:{},    // raw input numbers for rawpoints exercises (separate from scores)
     tournaments:{},  // tournament data per exercise id
     pointScheme:{1:10,2:6,3:3,4:1},
     templates:[],
@@ -952,6 +954,7 @@ function migrateState(){
   if(!state.exercises) state.exercises = [];
   if(!state.tournaments) state.tournaments = {};
   if(!state.scores) state.scores = {};
+  if(!state.rawScores) state.rawScores = {};
   if(!state.members) state.members = {cocky:[],ossia:[],bergen:[],teisen:[]};
   if(!state.pointScheme) state.pointScheme = {1:10,2:6,3:3,4:1};
   // Normalize pointScheme keys to numbers (Firebase stores as strings)
@@ -975,6 +978,10 @@ function migrateState(){
       else if(ex.type==='knockout') state.tournaments[ex.id]=defaultKnockout();
       else if(ex.type==='killerdart') state.tournaments[ex.id]=defaultKillerDart();
       else if(ex.type==='axecup') state.tournaments[ex.id]=defaultAxeCup();
+      dirty=true;
+    }
+    if(ex.type==='rawpoints' && !state.rawScores[ex.id]){
+      state.rawScores[ex.id]={cocky:0,ossia:0,bergen:0,teisen:0};
       dirty=true;
     }
   });
@@ -1175,6 +1182,7 @@ function adminAddExercise(){
   else if(type==='knockout') state.tournaments[id]=defaultKnockout();
   else if(type==='killerdart') state.tournaments[id]=defaultKillerDart();
   else if(type==='axecup') state.tournaments[id]=defaultAxeCup();
+  else if(type==='rawpoints'){state.scores[id]={cocky:0,ossia:0,bergen:0,teisen:0};state.rawScores[id]={cocky:0,ossia:0,bergen:0,teisen:0};}
   else state.scores[id]={cocky:0,ossia:0,bergen:0,teisen:0};
   document.getElementById('admin-ex-name').value='';
   save();renderAll();toast('«'+name+'» lagt til!');
@@ -1182,7 +1190,7 @@ function adminAddExercise(){
 function removeExercise(id){
   const ex=state.exercises.find(e=>e.id===id);
   state.exercises=state.exercises.filter(e=>e.id!==id);
-  delete state.scores[id];delete state.tournaments[id];
+  delete state.scores[id];delete state.tournaments[id];delete state.rawScores[id];
   save();renderAll();if(ex)toast('«'+ex.name+'» slettet','error');
 }
 
@@ -1206,6 +1214,31 @@ function updateScore(exId,teamId,val){
 }
 function setRanking(exId,teamId,rank){
   state.scores[exId][teamId]=rank>0?(state.pointScheme[rank]??0):0;save();renderDashboard();
+}
+// Raw-points: admin enters raw scores (e.g. bowling 187), app sorts and assigns
+// pointScheme values (10/6/3/1) by ranking. Ties share the higher rank (same points).
+function updateRawScore(exId,teamId,val){
+  if(!state.rawScores[exId]) state.rawScores[exId]={cocky:0,ossia:0,bergen:0,teisen:0};
+  state.rawScores[exId][teamId]=parseFloat(val)||0;
+  recomputeRawRanking(exId);
+  save();renderDashboard();
+}
+function recomputeRawRanking(exId){
+  const raw=state.rawScores[exId]||{};
+  // Only rank teams that have a raw score > 0; teams with 0 get 0 points (not yet played)
+  const entered=TEAMS.filter(t=>(raw[t.id]||0)>0);
+  // Reset all to 0 first
+  state.scores[exId]={cocky:0,ossia:0,bergen:0,teisen:0};
+  if(!entered.length) return;
+  // Sort descending by raw score
+  const sorted=[...entered].sort((a,b)=>(raw[b.id]||0)-(raw[a.id]||0));
+  // Assign rank, with ties sharing the higher rank's points
+  let curRank=1;
+  for(let i=0;i<sorted.length;i++){
+    if(i>0 && raw[sorted[i].id] < raw[sorted[i-1].id]) curRank=i+1;
+    const pts=state.pointScheme[curRank]??0;
+    state.scores[exId][sorted[i].id]=pts;
+  }
 }
 
 // ===== TOURNAMENT LOGIC =====
@@ -1331,9 +1364,10 @@ function confirmReset(type){
     else if(ex.type==='knockout') state.tournaments[ex.id]=defaultKnockout();
     else if(ex.type==='killerdart') state.tournaments[ex.id]=defaultKillerDart();
     else if(ex.type==='axecup') state.tournaments[ex.id]=defaultAxeCup();
+    else if(ex.type==='rawpoints') state.rawScores[ex.id]={cocky:0,ossia:0,bergen:0,teisen:0};
   });}
   else if(type==='members'){TEAMS.forEach(t=>state.members[t.id]=[]);}
-  else if(type==='exercises'){state.exercises=[];state.scores={};state.tournaments={};}
+  else if(type==='exercises'){state.exercises=[];state.scores={};state.tournaments={};state.rawScores={};}
   else if(type==='all'){Object.assign(state,defaultState());}
   save();renderAll();toast('Tilbakestilt!','error');
 }
@@ -1536,15 +1570,34 @@ function renderExercises(){
     if(ex.type==='killerdart') return renderKillerDartHTML(ex.id,ex.name,isAdmin);
     if(ex.type==='axecup') return renderAxeCupHTML(ex.id,ex.name,isAdmin);
     const s=state.scores[ex.id]||{};
-    const sorted=[...TEAMS].sort((a,b)=>(s[b.id]||0)-(s[a.id]||0));
+    const isRaw=ex.type==='rawpoints';
+    const raw=isRaw?(state.rawScores[ex.id]||{}):null;
+    // For rawpoints: sort by raw score (more granular than point bucket); else by points
+    const sorted=[...TEAMS].sort((a,b)=>{
+      if(isRaw) return (raw[b.id]||0)-(raw[a.id]||0);
+      return (s[b.id]||0)-(s[a.id]||0);
+    });
     const exNum=state.exercises.indexOf(ex)+1;
+    const tagLabel=ex.type==='ranking'?'Rangering':ex.type==='rawpoints'?'Rå → Rangering':'Manuell poengføring';
+    const tagClass=ex.type==='ranking'?'tag-ranking':'tag-points';
+    const headers=isRaw
+      ? '<tr><th>#</th><th>Lag</th><th>Rå</th><th>Poeng</th></tr>'
+      : '<tr><th>#</th><th>Lag</th><th>Poeng</th></tr>';
+    const rows=sorted.map((t,i)=>{
+      const placeColor=i===0?'var(--gold)':i===1?'var(--silver)':i===2?'var(--bronze)':'var(--muted)';
+      const teamCell=`<td><span class="${t.tc}" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1px;">${t.name}</span></td>`;
+      if(isRaw){
+        return `<tr><td style="color:${placeColor};font-weight:700;">${i+1}</td>${teamCell}<td style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--muted2);">${raw[t.id]||0}</td><td class="score-big ${t.tc}">${s[t.id]||0}</td></tr>`;
+      }
+      return `<tr><td style="color:${placeColor};font-weight:700;">${i+1}</td>${teamCell}<td class="score-big ${t.tc}">${s[t.id]||0}</td></tr>`;
+    }).join('');
     return `<div class="ex-card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
         <div style="display:flex;align-items:center;gap:.5rem;"><span class="ex-order-num" style="width:24px;height:24px;font-size:.9rem;">${exNum}</span><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.1rem;letter-spacing:1px;">${ex.name}</span></div>
-        <div style="display:flex;align-items:center;gap:.5rem;"><button class="btn-rules" onclick="openRulesModal('${ex.id}')">📋 Regler</button><span class="tag ${ex.type==='ranking'?'tag-ranking':'tag-points'}">${ex.type==='ranking'?'Rangering':'Manuell poengføring'}</span></div>
+        <div style="display:flex;align-items:center;gap:.5rem;"><button class="btn-rules" onclick="openRulesModal('${ex.id}')">📋 Regler</button><span class="tag ${tagClass}">${tagLabel}</span></div>
       </div>
-      <table class="tbl"><thead><tr><th>#</th><th>Lag</th><th>Poeng</th></tr></thead>
-      <tbody>${sorted.map((t,i)=>`<tr><td style="color:${i===0?'var(--gold)':i===1?'var(--silver)':i===2?'var(--bronze)':'var(--muted)'};font-weight:700;">${i+1}</td><td><span class="${t.tc}" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1px;">${t.name}</span></td><td class="score-big ${t.tc}">${s[t.id]||0}</td></tr>`).join('')}</tbody></table>
+      <table class="tbl"><thead>${headers}</thead>
+      <tbody>${rows}</tbody></table>
     </div>`;
   }).join('');
 }
@@ -1564,6 +1617,27 @@ function renderResults(){
     if(ex.type==='axecup') return injectReset(renderAxeCupHTML(ex.id,ex.name,true));
 
     const s=state.scores[ex.id]||{};
+    if(ex.type==='rawpoints'){
+      const raw=state.rawScores[ex.id]||{cocky:0,ossia:0,bergen:0,teisen:0};
+      return `<div class="card" style="margin-bottom:1.5rem;">
+        <div class="flex-between" style="margin-bottom:1rem;">
+          <div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2px;">${ex.name}</div>
+          <div style="color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.78rem;text-transform:uppercase;letter-spacing:1px;">${schemeStr}</div></div>
+          <span class="tag tag-points">Rå → Rangering</span>
+        </div>
+        <div class="score-inputs">${TEAMS.map(t=>{
+          const rawVal=raw[t.id]||0;
+          const awarded=s[t.id]||0;
+          const rank=[1,2,3,4].find(r=>state.pointScheme[r]===awarded&&awarded>0)||0;
+          const rankLabel=rank===1?'🥇 1.':rank===2?'🥈 2.':rank===3?'🥉 3.':rank===4?'4.':'–';
+          return `<div class="sig"><label class="${t.tc}">${t.name}</label>
+            <input type="number" min="0" value="${rawVal||''}" placeholder="Rå-poeng" style="border-color:${t.color}55;color:${t.color};"
+              oninput="updateRawScore('${ex.id}','${t.id}',this.value)" onchange="updateRawScore('${ex.id}','${t.id}',this.value)">
+            <span style="font-size:.75rem;color:var(--muted);font-family:'Barlow Condensed',sans-serif;text-align:center;">${awarded>0?rankLabel+' plass · '+awarded+' pts':'–'}</span>
+          </div>`;}).join('')}
+        </div>
+      </div>`;
+    }
     if(ex.type==='ranking'){
       return `<div class="card" style="margin-bottom:1.5rem;">
         <div class="flex-between" style="margin-bottom:1rem;">
@@ -2705,7 +2779,7 @@ function renderTemplates(){
   const el = document.getElementById('admin-templates-list');
   if(!el) return;
   const templates = state.templates||[];
-  const typeLabels={ranking:'Rangering',points:'Poeng',tournament:'Turnering',knockout:'Sluttspill',killerdart:'Killer Dart',axecup:'Øksekast Cup'};
+  const typeLabels={ranking:'Rangering',points:'Poeng',rawpoints:'Rå → Rangering',tournament:'Turnering',knockout:'Sluttspill',killerdart:'Killer Dart',axecup:'Øksekast Cup'};
   if(!templates.length){
     el.innerHTML='<div class="empty" style="padding:.8rem;">Ingen maler lagret ennå. Klikk «💾 Lagre mal» på en øvelse for å lagre den.</div>';
     return;
@@ -2745,7 +2819,7 @@ function switchInstallTab(tab){
 function openRulesModal(exId){
   const ex = state.exercises.find(e=>e.id===exId);
   if(!ex) return;
-  const typeLabels={ranking:'Rangering',points:'Manuell poengføring',tournament:'Turnering',knockout:'Sluttspill'};
+  const typeLabels={ranking:'Rangering',points:'Manuell poengføring',rawpoints:'Rå → Rangering',tournament:'Turnering',knockout:'Sluttspill',killerdart:'Killer Dart',axecup:'Øksekast Cup'};
   document.getElementById('rules-modal-title').textContent = ex.name;
   document.getElementById('rules-modal-type').textContent = typeLabels[ex.type]||ex.type;
   const body = document.getElementById('rules-modal-body');
