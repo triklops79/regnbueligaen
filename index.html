@@ -1261,10 +1261,12 @@ function removeMember(team,idx){
 
 // ===== SCORES (non-tournament) =====
 function updateScore(exId,teamId,val){
-  state.scores[exId][teamId]=parseFloat(val)||0;save();renderDashboard();
+  state.scores[exId][teamId]=parseFloat(val)||0;
+  save();preservingState(()=>renderDashboard());
 }
 function setRanking(exId,teamId,rank){
-  state.scores[exId][teamId]=rank>0?(state.pointScheme[rank]??0):0;save();renderDashboard();
+  state.scores[exId][teamId]=rank>0?(state.pointScheme[rank]??0):0;
+  save();preservingState(()=>renderDashboard());
 }
 // Raw-points: admin enters raw scores (e.g. bowling 187), app sorts and assigns
 // pointScheme values (10/6/3/1) by ranking. Ties share the higher rank (same points).
@@ -1272,7 +1274,7 @@ function updateRawScore(exId,teamId,val){
   if(!state.rawScores[exId]) state.rawScores[exId]={cocky:0,ossia:0,bergen:0,teisen:0};
   state.rawScores[exId][teamId]=parseFloat(val)||0;
   recomputeRawRanking(exId);
-  save();renderDashboard();
+  save();preservingState(()=>{renderDashboard();if(isAdmin)renderResults();});
 }
 function recomputeRawRanking(exId){
   const raw=state.rawScores[exId]||{};
@@ -1424,7 +1426,34 @@ function confirmReset(type){
 }
 
 // ===== RENDER =====
-function renderAll(){renderDashboard();renderTeams();renderExercises();renderProgram();if(isAdmin){renderResults();renderAdmin();}}
+// Preserve scroll position and active input focus across re-renders.
+// Without this, every keystroke in a score field causes the page to jump to top.
+function preservingState(fn){
+  const scrollY = window.scrollY;
+  const active = document.activeElement;
+  let focusId=null, selStart=null, selEnd=null;
+  if(active && active.id && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.tagName==='SELECT')){
+    focusId = active.id;
+    try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch(e){}
+  }
+  fn();
+  window.scrollTo(0, scrollY);
+  if(focusId){
+    const el = document.getElementById(focusId);
+    if(el){
+      el.focus({preventScroll:true});
+      if(selStart !== null && el.setSelectionRange){
+        try { el.setSelectionRange(selStart, selEnd); } catch(e){}
+      }
+    }
+  }
+}
+function renderAll(){
+  preservingState(()=>{
+    renderDashboard();renderTeams();renderExercises();renderProgram();
+    if(isAdmin){renderResults();renderAdmin();}
+  });
+}
 
 // --- helpers ---
 function tName(idx){return idx===null||idx===undefined?'TBD':TEAMS[idx].name;}
@@ -1682,7 +1711,7 @@ function renderResults(){
           const rank=[1,2,3,4].find(r=>state.pointScheme[r]===awarded&&awarded>0)||0;
           const rankLabel=rank===1?'🥇 1.':rank===2?'🥈 2.':rank===3?'🥉 3.':rank===4?'4.':'–';
           return `<div class="sig"><label class="${t.tc}">${t.name}</label>
-            <input type="number" min="0" value="${rawVal||''}" placeholder="Rå-poeng" style="border-color:${t.color}55;color:${t.color};"
+            <input id="inp-raw-${ex.id}-${t.id}" type="number" min="0" value="${rawVal||''}" placeholder="Rå-poeng" style="border-color:${t.color}55;color:${t.color};"
               oninput="updateRawScore('${ex.id}','${t.id}',this.value)" onchange="updateRawScore('${ex.id}','${t.id}',this.value)">
             <span style="font-size:.75rem;color:var(--muted);font-family:'Barlow Condensed',sans-serif;text-align:center;">${awarded>0?rankLabel+' plass · '+awarded+' pts':'–'}</span>
           </div>`;}).join('')}
@@ -1718,7 +1747,7 @@ function renderResults(){
         <span class="tag tag-points">Poeng</span>
       </div>
       <div class="score-inputs">${TEAMS.map(t=>`<div class="sig"><label class="${t.tc}">${t.name}</label>
-        <input type="number" min="0" value="${s[t.id]||0}" style="border-color:${t.color}55;color:${t.color};"
+        <input id="inp-pts-${ex.id}-${t.id}" type="number" min="0" value="${s[t.id]||0}" style="border-color:${t.color}55;color:${t.color};"
           oninput="updateScore('${ex.id}','${t.id}',this.value)" onchange="updateScore('${ex.id}','${t.id}',this.value)">
       </div>`).join('')}</div>
     </div>`;
@@ -1742,14 +1771,14 @@ function renderTournamentEntry(exId,name){
           <div class="group-match-title">Kamp ${i+1}</div>
           <div class="group-match-row">
             <span class="group-match-name ${ta.tc}">${ta.name}</span>
-            <input class="group-match-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
+            <input id="inp-grp-${exId}-${i}-a" class="group-match-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
               style="border-color:${ta.color}66;color:${ta.color};"
               onchange="updateGroupScore('${exId}',${i},'a',this.value)"
               oninput="updateGroupScore('${exId}',${i},'a',this.value)">
           </div>
           <div class="group-match-row">
             <span class="group-match-name ${tb.tc}">${tb.name}</span>
-            <input class="group-match-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
+            <input id="inp-grp-${exId}-${i}-b" class="group-match-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
               style="border-color:${tb.color}66;color:${tb.color};"
               onchange="updateGroupScore('${exId}',${i},'b',this.value)"
               oninput="updateGroupScore('${exId}',${i},'b',this.value)">
@@ -1799,7 +1828,7 @@ function renderTournamentEntry(exId,name){
             <div class="match-entry-title">Semifinale ${ri+1}</div>
             <div class="match-entry-row">
               <span class="match-entry-name ${ta?ta.tc:''}" style="color:${ta?ta.color:'var(--muted)'};">${ta?ta.name:'TBD'}</span>
-              <input class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
+              <input id="inp-ko-${exId}-${round}-a" class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
                 style="border-color:${ta?ta.color+'66':'var(--border2)'};color:${ta?ta.color:'var(--text)'};"
                 onchange="updateKnockoutScore('${exId}','${round}','a',this.value)"
                 oninput="updateKnockoutScore('${exId}','${round}','a',this.value)">
@@ -1807,7 +1836,7 @@ function renderTournamentEntry(exId,name){
             <div class="match-entry-vs">vs</div>
             <div class="match-entry-row" style="margin-top:.3rem;">
               <span class="match-entry-name ${tb?tb.tc:''}" style="color:${tb?tb.color:'var(--muted)'};">${tb?tb.name:'TBD'}</span>
-              <input class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
+              <input id="inp-ko-${exId}-${round}-b" class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
                 style="border-color:${tb?tb.color+'66':'var(--border2)'};color:${tb?tb.color:'var(--text)'};"
                 onchange="updateKnockoutScore('${exId}','${round}','b',this.value)"
                 oninput="updateKnockoutScore('${exId}','${round}','b',this.value)">
@@ -1833,7 +1862,7 @@ function renderTournamentEntry(exId,name){
               <div class="match-entry-title ${isFinal?'final-t':'bronze-t'}">${isFinal?'🏆 Finale':'🥉 Bronsefinale'}</div>
               <div class="match-entry-row">
                 <span class="match-entry-name ${ta?ta.tc:''}" style="color:${ta?ta.color:'var(--muted)'};">${ta?ta.name:'TBD'}</span>
-                <input class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
+                <input id="inp-ko-${exId}-${round}-a" class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
                   style="border-color:${ta?ta.color+'66':'var(--border2)'};color:${ta?ta.color:'var(--text)'};"
                   onchange="updateKnockoutScore('${exId}','${round}','a',this.value)"
                   oninput="updateKnockoutScore('${exId}','${round}','a',this.value)">
@@ -1841,7 +1870,7 @@ function renderTournamentEntry(exId,name){
               <div class="match-entry-vs">vs</div>
               <div class="match-entry-row" style="margin-top:.3rem;">
                 <span class="match-entry-name ${tb?tb.tc:''}" style="color:${tb?tb.color:'var(--muted)'};">${tb?tb.name:'TBD'}</span>
-                <input class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
+                <input id="inp-ko-${exId}-${round}-b" class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
                   style="border-color:${tb?tb.color+'66':'var(--border2)'};color:${tb?tb.color:'var(--text)'};"
                   onchange="updateKnockoutScore('${exId}','${round}','b',this.value)"
                   oninput="updateKnockoutScore('${exId}','${round}','b',this.value)">
@@ -2020,7 +2049,7 @@ function renderKnockoutEntry(exId,name){
             <div class="match-entry-title">Semifinale ${ri+1}</div>
             <div class="match-entry-row">
               <span class="match-entry-name ${ta?ta.tc:''}" style="color:${ta?ta.color:'var(--muted)'};">${ta?ta.name:'TBD'}</span>
-              <input class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
+              <input id="inp-ko-${exId}-${round}-a" class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
                 style="border-color:${ta?ta.color+'66':'var(--border2)'};color:${ta?ta.color:'var(--text)'};"
                 onchange="updateKnockoutScore('${exId}','${round}','a',this.value)"
                 oninput="updateKnockoutScore('${exId}','${round}','a',this.value)">
@@ -2028,7 +2057,7 @@ function renderKnockoutEntry(exId,name){
             <div class="match-entry-vs">vs</div>
             <div class="match-entry-row" style="margin-top:.3rem;">
               <span class="match-entry-name ${tb?tb.tc:''}" style="color:${tb?tb.color:'var(--muted)'};">${tb?tb.name:'TBD'}</span>
-              <input class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
+              <input id="inp-ko-${exId}-${round}-b" class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
                 style="border-color:${tb?tb.color+'66':'var(--border2)'};color:${tb?tb.color:'var(--text)'};"
                 onchange="updateKnockoutScore('${exId}','${round}','b',this.value)"
                 oninput="updateKnockoutScore('${exId}','${round}','b',this.value)">
@@ -2054,7 +2083,7 @@ function renderKnockoutEntry(exId,name){
               <div class="match-entry-title ${isFinal?'final-t':'bronze-t'}">${isFinal?'🏆 Finale':'🥉 Bronsefinale'}</div>
               <div class="match-entry-row">
                 <span class="match-entry-name ${ta?ta.tc:''}" style="color:${ta?ta.color:'var(--muted)'};">${ta?ta.name:'TBD'}</span>
-                <input class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
+                <input id="inp-ko-${exId}-${round}-a" class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreA!==null&&m.scoreA!==undefined)?m.scoreA:''}"
                   style="border-color:${ta?ta.color+'66':'var(--border2)'};color:${ta?ta.color:'var(--text)'};"
                   onchange="updateKnockoutScore('${exId}','${round}','a',this.value)"
                   oninput="updateKnockoutScore('${exId}','${round}','a',this.value)">
@@ -2062,7 +2091,7 @@ function renderKnockoutEntry(exId,name){
               <div class="match-entry-vs">vs</div>
               <div class="match-entry-row" style="margin-top:.3rem;">
                 <span class="match-entry-name ${tb?tb.tc:''}" style="color:${tb?tb.color:'var(--muted)'};">${tb?tb.name:'TBD'}</span>
-                <input class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
+                <input id="inp-ko-${exId}-${round}-b" class="match-entry-input" type="number" min="0" placeholder="–" value="${(m.scoreB!==null&&m.scoreB!==undefined)?m.scoreB:''}"
                   style="border-color:${tb?tb.color+'66':'var(--border2)'};color:${tb?tb.color:'var(--text)'};"
                   onchange="updateKnockoutScore('${exId}','${round}','b',this.value)"
                   oninput="updateKnockoutScore('${exId}','${round}','b',this.value)">
@@ -2643,7 +2672,7 @@ function renderAxeCupHTML(exId,name,editable){
         const isLoser=decided && !isWinner;
         const scoreVal=(m.scores&&m.scores['p'+mp.idx]!==undefined&&m.scores['p'+mp.idx]!==null)?m.scores['p'+mp.idx]:'';
         const scoreInput=scoreEditable
-          ? `<input class="axe-score-input" type="number" min="0" placeholder="–" value="${scoreVal}"
+          ? `<input id="inp-axe-${exId}-${ri}-${mi}-${mp.idx}" class="axe-score-input" type="number" min="0" placeholder="–" value="${scoreVal}"
               style="border-color:${mp.team.color}66;color:${mp.team.color};"
               oninput="axeSetScore('${exId}',${ri},${mi},${mp.idx},this.value)"
               onchange="axeSetScore('${exId}',${ri},${mi},${mp.idx},this.value)">`
