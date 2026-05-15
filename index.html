@@ -1636,6 +1636,7 @@ function renderResults(){
             <span style="font-size:.75rem;color:var(--muted);font-family:'Barlow Condensed',sans-serif;text-align:center;">${awarded>0?rankLabel+' plass · '+awarded+' pts':'–'}</span>
           </div>`;}).join('')}
         </div>
+        ${resetScoreBtn}
       </div>`;
     }
     if(ex.type==='ranking'){
@@ -2734,6 +2735,7 @@ function resetExerciseScores(exId){
   if(!confirm('Nullstille poengene for denne øvelsen?')) return;
   saveBackup();
   state.scores[exId]={cocky:0,ossia:0,bergen:0,teisen:0};
+  if(state.rawScores && state.rawScores[exId]) state.rawScores[exId]={cocky:0,ossia:0,bergen:0,teisen:0};
   save();renderDashboard();renderResults();toast('Poeng nullstilt');
 }
 
