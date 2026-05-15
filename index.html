@@ -245,8 +245,9 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 .axe-match.axe-bronze{border-color:rgba(205,127,50,.4);}
 .axe-score-input{width:52px;text-align:center;font-family:'Bebas Neue',sans-serif;font-size:1.3rem;padding:.2rem .25rem;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);outline:none;transition:.2s;flex-shrink:0;}
 .axe-score-input:focus{border-color:var(--muted2);}
-.axe-match-player{display:flex;align-items:center;justify-content:space-between;padding:.45rem .75rem;gap:.4rem;}
-.axe-match-player:first-child{border-bottom:1px solid var(--border);}
+.axe-match-player{display:flex;align-items:center;justify-content:space-between;padding:.45rem .75rem;gap:.4rem;border-bottom:1px solid var(--border);}
+.axe-match-player + .axe-match-player + .axe-match-player{}
+.axe-match > .axe-match-player:last-of-type{border-bottom:none;}
 .axe-match-player.axe-winner{background:rgba(255,255,255,.05);}
 .axe-match-player.axe-loser{opacity:.4;}
 .axe-match-player.axe-bye{opacity:.5;font-style:italic;}
@@ -983,6 +984,28 @@ function migrateState(){
     if(ex.type==='rawpoints' && !state.rawScores[ex.id]){
       state.rawScores[ex.id]={cocky:0,ossia:0,bergen:0,teisen:0};
       dirty=true;
+    }
+    // Migrate axecup from old format (p1/p2/scoreP1/scoreP2/winner) to new (players/scores/winners)
+    if(ex.type==='axecup' && state.tournaments[ex.id] && Array.isArray(state.tournaments[ex.id].rounds)){
+      state.tournaments[ex.id].rounds.forEach(round=>{
+        if(!Array.isArray(round)) return;
+        round.forEach(m=>{
+          if(m && m.players===undefined && m.p1!==undefined){
+            const players=[m.p1];
+            if(m.p2!==null && m.p2!==undefined) players.push(m.p2);
+            m.players=players;
+            m.scores={};
+            if(m.scoreP1!==null && m.scoreP1!==undefined) m.scores[m.p1]=m.scoreP1;
+            if(m.scoreP2!==null && m.scoreP2!==undefined && m.p2!==null) m.scores[m.p2]=m.scoreP2;
+            m.winners=(m.winner!==null && m.winner!==undefined)?[m.winner]:[];
+            // Old byes become solo matches with the player as winner — but new format never has byes.
+            // If it was a bye, treat as already-resolved (player advances). We model by giving them as sole winner.
+            // (cleanup: remove old keys to keep state tidy)
+            delete m.p1; delete m.p2; delete m.scoreP1; delete m.scoreP2; delete m.winner; delete m.bye;
+            dirty=true;
+          }
+        });
+      });
     }
   });
   return dirty;
@@ -2227,14 +2250,15 @@ function renderKillerDartHTML(exId, name, editable){
 function defaultAxeCup(){
   return {
     phase: 'setup',  // setup | playing | done
-    players: [],     // [{name, teamId, eliminated, placement}]
-    rounds: [],      // array of rounds, each round = [{p1idx, p2idx, winner, bye}]
+    players: [],     // [{name, teamId, eliminated, placement, lastScore}]
+    rounds: [],      // each round = array of matches: {players:[idx,...], scores:{idx:n}, winners:[idx,...], isFinal, isBronze, isTripleFinal}
     currentRound: 0,
     log: []
   };
 }
 
-// Build first round: random pairs, no same-team matchups
+// Build a round from alive players. Never create walkovers — if odd count,
+// produce ONE three-way match where 2 advance, 1 is eliminated.
 function axeBuildRound(players){
   const alive = players.map((p,i)=>({...p,idx:i})).filter(p=>!p.eliminated);
   // Shuffle
@@ -2242,38 +2266,52 @@ function axeBuildRound(players){
     const j=Math.floor(Math.random()*(i+1));
     [alive[i],alive[j]]=[alive[j],alive[i]];
   }
-  // Try to pair without same team – max 20 attempts
-  function tryPair(arr){
-    const matches=[];
-    const used=new Set();
-    for(let i=0;i<arr.length;i++){
-      if(used.has(i)) continue;
-      let paired=false;
-      for(let j=i+1;j<arr.length;j++){
-        if(used.has(j)) continue;
-        if(arr[i].teamId!==arr[j].teamId){
-          matches.push({p1:arr[i].idx,p2:arr[j].idx,winner:null,bye:false,scoreP1:null,scoreP2:null});
-          used.add(i);used.add(j);paired=true;break;
-        }
-      }
-      if(!paired){
-        // fallback: pair with anyone
-        for(let j=i+1;j<arr.length;j++){
-          if(!used.has(j)){
-            matches.push({p1:arr[i].idx,p2:arr[j].idx,winner:null,bye:false,scoreP1:null,scoreP2:null});
-            used.add(i);used.add(j);paired=true;break;
-          }
-        }
-      }
-      if(!paired && !used.has(i)){
-        // Odd one out – bye
-        matches.push({p1:arr[i].idx,p2:null,winner:arr[i].idx,bye:true});
-        used.add(i);
+  const matches=[];
+  const used=new Set();
+  // If odd count, pick 3 for a triple match first — try to avoid same team
+  if(alive.length % 2 === 1){
+    let triple=null;
+    // Try several random attempts to pick a triple with as few same-team conflicts as possible
+    let bestScore=999;
+    for(let attempt=0; attempt<30; attempt++){
+      const picks=[];
+      const pool=alive.slice();
+      // shuffle pool
+      for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+      picks.push(pool[0],pool[1],pool[2]);
+      // Score = number of same-team pairs
+      let conflicts=0;
+      if(picks[0].teamId===picks[1].teamId) conflicts++;
+      if(picks[0].teamId===picks[2].teamId) conflicts++;
+      if(picks[1].teamId===picks[2].teamId) conflicts++;
+      if(conflicts<bestScore){ bestScore=conflicts; triple=picks; if(conflicts===0) break; }
+    }
+    matches.push({players:[triple[0].idx,triple[1].idx,triple[2].idx],scores:{},winners:[],isTriple:true});
+    used.add(triple[0].idx);used.add(triple[1].idx);used.add(triple[2].idx);
+  }
+  // Pair remaining into duels
+  const remaining = alive.filter(p=>!used.has(p.idx));
+  for(let i=0;i<remaining.length;i++){
+    if(used.has(remaining[i].idx)) continue;
+    let paired=false;
+    // try to find non-same-team partner
+    for(let j=i+1;j<remaining.length;j++){
+      if(used.has(remaining[j].idx)) continue;
+      if(remaining[i].teamId!==remaining[j].teamId){
+        matches.push({players:[remaining[i].idx,remaining[j].idx],scores:{},winners:[]});
+        used.add(remaining[i].idx);used.add(remaining[j].idx);paired=true;break;
       }
     }
-    return matches;
+    if(!paired){
+      for(let j=i+1;j<remaining.length;j++){
+        if(!used.has(remaining[j].idx)){
+          matches.push({players:[remaining[i].idx,remaining[j].idx],scores:{},winners:[]});
+          used.add(remaining[i].idx);used.add(remaining[j].idx);paired=true;break;
+        }
+      }
+    }
   }
-  return tryPair(alive);
+  return matches;
 }
 
 function axeStartCup(exId){
@@ -2289,49 +2327,100 @@ function axeStartCup(exId){
   save();renderAll();toast('Cup startet! 🪓');
 }
 
+// Manual winner pick (used for ties). For triple matches, pass an array of winner indices.
 function axeSetWinner(exId,roundIdx,matchIdx,winnerIdx){
   const ax=state.tournaments[exId];
   const match=ax.rounds[roundIdx][matchIdx];
-  match.winner=winnerIdx;
+  if(match.isTriple){
+    // toggle membership in winners array (max 2 winners)
+    const w = Array.isArray(match.winners) ? match.winners.slice() : [];
+    const i = w.indexOf(winnerIdx);
+    if(i>=0){ w.splice(i,1); }
+    else if(w.length<2){ w.push(winnerIdx); }
+    match.winners = w;
+  } else {
+    match.winners = [winnerIdx];
+  }
   save();renderAll();
 }
 
-function axeSetScore(exId,roundIdx,matchIdx,which,val){
+// Set score for one player in a match
+function axeSetScore(exId,roundIdx,matchIdx,playerIdx,val){
   const ax=state.tournaments[exId];
   const match=ax.rounds[roundIdx][matchIdx];
+  if(!match.scores) match.scores={};
   const v=val===''?null:(parseInt(val)>=0?parseInt(val):null);
-  if(which==='p1') match.scoreP1=v;
-  else match.scoreP2=v;
-  // Auto-determine winner if both scores entered
-  if(match.scoreP1!==null && match.scoreP2!==null){
-    if(match.scoreP1>match.scoreP2) match.winner=match.p1;
-    else if(match.scoreP2>match.scoreP1) match.winner=match.p2;
-    else match.winner=null; // tie – no auto-winner
+  if(v===null) delete match.scores[playerIdx];
+  else match.scores[playerIdx]=v;
+  // Auto-determine winners if all players have scores
+  const allHaveScores = match.players.every(p=>match.scores[p]!==undefined && match.scores[p]!==null);
+  if(allHaveScores){
+    // Sort by score desc
+    const sorted=[...match.players].sort((a,b)=>match.scores[b]-match.scores[a]);
+    if(match.isTriple){
+      // top 2 advance, but only if 3rd place is strictly lower than 2nd (else ambiguous)
+      if(match.scores[sorted[1]]>match.scores[sorted[2]]){
+        match.winners=[sorted[0],sorted[1]];
+      } else {
+        // 2nd and 3rd tied — admin must resolve
+        match.winners=[];
+      }
+    } else {
+      // duel: highest wins, ties → admin resolves
+      if(match.scores[sorted[0]]>match.scores[sorted[1]]){
+        match.winners=[sorted[0]];
+      } else {
+        match.winners=[];
+      }
+    }
   } else {
-    match.winner=null;
+    match.winners=[];
   }
   save();renderAll();
+}
+
+// Helper: are this round's matches all done?
+function axeRoundComplete(round){
+  return round.every(m=>{
+    const need=m.isTriple?2:1;
+    return Array.isArray(m.winners) && m.winners.length===need;
+  });
 }
 
 function axeAdvanceRound(exId){
   const ax=state.tournaments[exId];
   const round=ax.rounds[ax.currentRound];
-  // Check all matches have winners
-  if(round.some(m=>m.winner===null)){toast('Alle kamper må ha en vinner!','error');return;}
+  if(!axeRoundComplete(round)){toast('Alle kamper må ha vinner(e)!','error');return;}
 
-  // Mark losers eliminated with placement
-  const alive=round.filter(m=>!m.bye).length;
+  // Collect losers from this round and store their last score for ranking
+  const losersThisRound=[];
   round.forEach(m=>{
-    if(!m.bye){
-      const loser=m.winner===m.p1?m.p2:m.p1;
-      ax.players[loser].eliminated=true;
-      ax.players[loser].placement=ax.players.filter(p=>!p.eliminated).length+1+1;
-    }
+    m.players.forEach(p=>{
+      if(!m.winners.includes(p)){
+        // store score for tie-breaking among same-round eliminations
+        ax.players[p].lastScore=(m.scores&&m.scores[p]!==undefined)?m.scores[p]:0;
+        losersThisRound.push(p);
+      }
+    });
   });
 
-  const winners=round.map(m=>m.winner);
+  // How many were alive before this round?
+  const aliveBefore=ax.players.filter(p=>!p.eliminated).length;
+  // Sort losers by score descending — higher score = better placement among same-round eliminations
+  losersThisRound.sort((a,b)=>(ax.players[b].lastScore||0)-(ax.players[a].lastScore||0));
+  // The first (best) eliminated gets placement = (aliveBefore - losers + 1)
+  // e.g. 10 alive, 4 losers → best-of-losers gets 7th, then 8, 9, 10
+  const aliveAfter=aliveBefore-losersThisRound.length;
+  losersThisRound.forEach((pIdx,i)=>{
+    ax.players[pIdx].eliminated=true;
+    ax.players[pIdx].placement=aliveAfter+1+i;
+  });
+
+  // Collect winners
+  const winners=[];
+  round.forEach(m=>m.winners.forEach(w=>winners.push(w)));
+
   if(winners.length===1){
-    // Done – final winner
     ax.players[winners[0]].placement=1;
     ax.phase='done';
     axeAssignPoints(exId);
@@ -2340,16 +2429,26 @@ function axeAdvanceRound(exId){
     return;
   }
   if(winners.length===2){
-    // Final + bronze from last 4
-    const lastRound=ax.rounds[ax.currentRound];
-    const losers=lastRound.filter(m=>!m.bye).map(m=>m.winner===m.p1?m.p2:m.p1);
-    ax.rounds.push([
-      {p1:winners[0],p2:winners[1],winner:null,bye:false,isFinal:true,scoreP1:null,scoreP2:null},
-      ...(losers.length>=2?[{p1:losers[0],p2:losers[1],winner:null,bye:false,isBronze:true,scoreP1:null,scoreP2:null}]:[])
-    ]);
+    // Build finale (duel) + bronze (the two losers from this round)
+    // Find this round's losers (only duel losers count for bronze — triple-losers are already gone deeper)
+    const finaleMatches=[{players:[winners[0],winners[1]],scores:{},winners:[],isFinal:true}];
+    // Bronze: pick the two highest-placed eliminated players from this round
+    if(losersThisRound.length>=2){
+      finaleMatches.push({players:[losersThisRound[0],losersThisRound[1]],scores:{},winners:[],isBronze:true});
+    }
+    ax.rounds.push(finaleMatches);
     ax.currentRound++;
     ax.log.unshift({text:'🏆 Finale og bronsefinale klar!',ts:now()});
     save();renderAll();toast('Finale satt opp!');
+    return;
+  }
+  if(winners.length===3){
+    // Three-way final: top 2 from this triple-final become 1st/2nd, last is 3rd
+    // We model it as a single triple match flagged as final
+    ax.rounds.push([{players:[winners[0],winners[1],winners[2]],scores:{},winners:[],isTriple:true,isTripleFinal:true}]);
+    ax.currentRound++;
+    ax.log.unshift({text:'🏆 Trekamp-finale (2 vinnere)!',ts:now()});
+    save();renderAll();toast('Trekamp-finale satt opp!');
     return;
   }
   // Build next round
@@ -2362,16 +2461,25 @@ function axeAdvanceRound(exId){
 function axeFinalizeFinals(exId){
   const ax=state.tournaments[exId];
   const finalRound=ax.rounds[ax.currentRound];
-  if(finalRound.some(m=>m.winner===null)){toast('Alle kamper må ha en vinner!','error');return;}
+  if(!axeRoundComplete(finalRound)){toast('Alle kamper må ha vinner(e)!','error');return;}
   finalRound.forEach(m=>{
-    if(m.isFinal){
-      ax.players[m.winner].placement=1;
-      const loser=m.winner===m.p1?m.p2:m.p1;
+    if(m.isTripleFinal){
+      // Top 2 in m.winners get 1st & 2nd (by score), the third gets 3rd
+      const top=m.winners; // length 2
+      const loser=m.players.find(p=>!top.includes(p));
+      // Among top, higher score = 1st
+      const sortedTop=[...top].sort((a,b)=>(m.scores[b]||0)-(m.scores[a]||0));
+      ax.players[sortedTop[0]].placement=1;
+      ax.players[sortedTop[1]].placement=2;
+      ax.players[loser].placement=3;
+      ax.players[loser].eliminated=true;
+    } else if(m.isFinal){
+      ax.players[m.winners[0]].placement=1;
+      const loser=m.players.find(p=>p!==m.winners[0]);
       ax.players[loser].placement=2;
-    }
-    if(m.isBronze){
-      ax.players[m.winner].placement=3;
-      const loser=m.winner===m.p1?m.p2:m.p1;
+    } else if(m.isBronze){
+      ax.players[m.winners[0]].placement=3;
+      const loser=m.players.find(p=>p!==m.winners[0]);
       ax.players[loser].placement=4;
     }
   });
@@ -2386,8 +2494,10 @@ function axeAssignPoints(exId){
   // Each team gets points for their best-placed player
   TEAMS.forEach(tm=>{
     const teamPlayers=ax.players.filter(p=>p.teamId===tm.id&&p.placement);
-    if(!teamPlayers.length) return;
+    if(!teamPlayers.length){ state.scores[exId][tm.id]=0; return; }
     const best=Math.min(...teamPlayers.map(p=>p.placement));
+    // Map raw placement to point scheme bucket: 1 → pointScheme[1], 2 → pointScheme[2], etc.
+    // For placements > 4, give 0 (or pointScheme[4] if you want the last bucket — keeping 0 for now)
     state.scores[exId][tm.id]=state.pointScheme[best]??0;
   });
 }
@@ -2407,8 +2517,8 @@ function axeRemovePlayer(exId,idx){
 function axeReset(exId){
   if(!confirm('Nullstille øksekast-cupen? Kun cupen nullstilles, øvelsene beholdes.')) return;
   saveBackup();
-  const old=state.tournaments[exId];
   state.tournaments[exId]=defaultAxeCup();
+  if(state.scores[exId]) state.scores[exId]={cocky:0,ossia:0,bergen:0,teisen:0};
   save();renderAll();toast('Cup nullstilt','error');
 }
 
@@ -2474,59 +2584,60 @@ function renderAxeCupHTML(exId,name,editable){
   if(!ax.rounds||!Array.isArray(ax.rounds)) ax.rounds=[];
   const roundsHTML=ax.rounds.map((round,ri)=>{
     const isCurrentRound=ri===ax.currentRound;
-    const isFinalRound=round.some(m=>m.isFinal);
-    const roundName=isFinalRound?'Finale & Bronsefinale':`Runde ${ri+1}`;
+    const isFinalRound=round.some(m=>m.isFinal||m.isTripleFinal);
+    const roundName=isFinalRound?(round.some(m=>m.isTripleFinal)?'Trekamp-finale':'Finale & Bronsefinale'):`Runde ${ri+1}`;
     const matchesHTML=round.map((m,mi)=>{
-      const p1=ax.players[m.p1];
-      const p2=m.p2!==null?ax.players[m.p2]:null;
-      const tm1=TEAMS.find(t=>t.id===p1.teamId);
-      const tm2=p2?TEAMS.find(t=>t.id===p2.teamId):null;
-      const lbl=m.isFinal?'🏆 Finale':m.isBronze?'🥉 Bronsefinale':m.bye?(ri===0?'Kaster alene – går videre':'Venter til neste runde'):'';
-      const lblClass=m.isFinal?'axe-final-lbl':m.isBronze?'axe-bronze-lbl':'';
-      const p1win=m.winner===m.p1;
-      const p2win=m.winner===m.p2;
+      const matchPlayers=(m.players||[]).map(pi=>({idx:pi,player:ax.players[pi],team:TEAMS.find(t=>t.id===ax.players[pi].teamId)}));
+      const isTriple=!!m.isTriple;
+      const lbl=m.isTripleFinal?'🏆 Trekamp-finale (2 går videre)':m.isFinal?'🏆 Finale':m.isBronze?'🥉 Bronsefinale':isTriple?'⚔️ Trekamp – 2 går videre':'';
+      const lblClass=m.isFinal||m.isTripleFinal?'axe-final-lbl':m.isBronze?'axe-bronze-lbl':'';
+      const scoreEditable=editable && ax.phase==='playing' && ri===ax.currentRound;
+      const winners=Array.isArray(m.winners)?m.winners:[];
 
-      const scoreEditable = editable && !m.bye && ax.phase==='playing' && ri===ax.currentRound;
-      const showScores = m.scoreP1!==null || m.scoreP2!==null;
+      // Determine if scores entry leads to a tie that requires manual resolution
+      const allHaveScores = matchPlayers.every(mp=>m.scores&&m.scores[mp.idx]!==undefined&&m.scores[mp.idx]!==null);
+      const sortedByScore = allHaveScores ? [...matchPlayers].sort((a,b)=>m.scores[b.idx]-m.scores[a.idx]) : [];
+      let tieNote='';
+      if(scoreEditable && allHaveScores && winners.length===0){
+        if(isTriple){
+          // tie for 2nd/3rd
+          tieNote = `<div style="padding:.3rem .6rem;background:rgba(255,215,0,.08);border-top:1px solid var(--border);font-family:'Barlow Condensed',sans-serif;font-size:.75rem;color:var(--gold);text-align:center;letter-spacing:1px;">Likt om 2. plass – velg 2 vinnere manuelt:</div>`;
+        } else {
+          tieNote = `<div style="padding:.3rem .6rem;background:rgba(255,215,0,.08);border-top:1px solid var(--border);font-family:'Barlow Condensed',sans-serif;font-size:.75rem;color:var(--gold);text-align:center;letter-spacing:1px;">Likt – velg vinner manuelt:</div>`;
+        }
+      }
 
-      const scoreInputP1 = scoreEditable
-        ? `<input class="axe-score-input" type="number" min="0" placeholder="–" value="${m.scoreP1!==null?m.scoreP1:''}"
-            style="border-color:${tm1.color}66;color:${tm1.color};"
-            oninput="axeSetScore('${exId}',${ri},${mi},'p1',this.value)"
-            onchange="axeSetScore('${exId}',${ri},${mi},'p1',this.value)">`
-        : (m.scoreP1!==null?`<span style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:${tm1.color};">${m.scoreP1}</span>`:'');
+      // Build player rows
+      const playerRows=matchPlayers.map(mp=>{
+        const isWinner=winners.includes(mp.idx);
+        const decided=winners.length===(isTriple?2:1);
+        const isLoser=decided && !isWinner;
+        const scoreVal=(m.scores&&m.scores[mp.idx]!==undefined&&m.scores[mp.idx]!==null)?m.scores[mp.idx]:'';
+        const scoreInput=scoreEditable
+          ? `<input class="axe-score-input" type="number" min="0" placeholder="–" value="${scoreVal}"
+              style="border-color:${mp.team.color}66;color:${mp.team.color};"
+              oninput="axeSetScore('${exId}',${ri},${mi},${mp.idx},this.value)"
+              onchange="axeSetScore('${exId}',${ri},${mi},${mp.idx},this.value)">`
+          : (scoreVal!==''?`<span style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:${mp.team.color};">${scoreVal}</span>`:'');
 
-      const scoreInputP2 = scoreEditable && p2
-        ? `<input class="axe-score-input" type="number" min="0" placeholder="–" value="${m.scoreP2!==null?m.scoreP2:''}"
-            style="border-color:${tm2?tm2.color+'66':'var(--border2)'};color:${tm2?tm2.color:'var(--text)'};"
-            oninput="axeSetScore('${exId}',${ri},${mi},'p2',this.value)"
-            onchange="axeSetScore('${exId}',${ri},${mi},'p2',this.value)">`
-        : (m.scoreP2!==null?`<span style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:${tm2?tm2.color:'var(--muted)'};">${m.scoreP2}</span>`:'');
+        // Manual winner pick button (only when there's a tie)
+        const pickBtn = scoreEditable && tieNote
+          ? `<button class="axe-winner-btn ${isWinner?'selected':''}" onclick="axeSetWinner('${exId}',${ri},${mi},${mp.idx})" title="Velg som vinner">🪓</button>`
+          : '';
 
-      const p1HTML=`<div class="axe-match-player ${p1win?'axe-winner':m.winner!==null&&!p1win?'axe-loser':''}">
-        <div style="flex:1;"><div class="axe-player-name ${tm1.tc}">${p1.name}</div><div class="axe-player-team">${tm1.name}</div></div>
-        ${scoreInputP1}
-        ${p1win&&!scoreEditable?'<span style="font-size:.9rem;margin-left:.3rem;">✓</span>':''}
-      </div>`;
+        return `<div class="axe-match-player ${isWinner?'axe-winner':isLoser?'axe-loser':''}">
+          <div style="flex:1;min-width:0;"><div class="axe-player-name ${mp.team.tc}">${mp.player.name}</div><div class="axe-player-team">${mp.team.name}</div></div>
+          ${scoreInput}
+          ${pickBtn}
+          ${isWinner&&!scoreEditable?'<span style="font-size:.9rem;margin-left:.3rem;">✓</span>':''}
+        </div>`;
+      }).join('');
 
-      const p2HTML=p2?`<div class="axe-match-player ${p2win?'axe-winner':m.winner!==null&&!p2win?'axe-loser':''}">
-        <div style="flex:1;"><div class="axe-player-name ${tm2.tc}">${p2.name}</div><div class="axe-player-team">${tm2.name}</div></div>
-        ${scoreInputP2}
-        ${p2win&&!scoreEditable?'<span style="font-size:.9rem;margin-left:.3rem;">✓</span>':''}
-      </div>`:`<div class="axe-match-player axe-bye"><div class="axe-player-name" style="color:var(--muted);">Kaster alene</div></div>`;
-
-      // Tie-breaker button if scores are equal
-      const tieHTML = scoreEditable && m.scoreP1!==null && m.scoreP2!==null && m.scoreP1===m.scoreP2
-        ? `<div style="padding:.3rem .6rem;background:rgba(255,215,0,.08);border-top:1px solid var(--border);display:flex;gap:.5rem;justify-content:center;">
-            <span style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;letter-spacing:1px;color:var(--gold);">Likt – velg vinner manuelt:</span>
-            <button class="axe-winner-btn" onclick="axeSetWinner('${exId}',${ri},${mi},${m.p1})" style="opacity:1;">🪓 ${p1.name}</button>
-            <button class="axe-winner-btn" onclick="axeSetWinner('${exId}',${ri},${mi},${m.p2})" style="opacity:1;">🪓 ${p2?p2.name:''}</button>
-          </div>` : '';
-
-      return `<div class="axe-match ${m.isFinal?'axe-final':m.isBronze?'axe-bronze':''}">${p1HTML}${p2HTML}${tieHTML}${lbl?`<div class="axe-match-label ${lblClass}">${lbl}</div>`:''}</div>`;
+      const matchClass=m.isFinal||m.isTripleFinal?'axe-final':m.isBronze?'axe-bronze':'';
+      return `<div class="axe-match ${matchClass}">${playerRows}${tieNote}${lbl?`<div class="axe-match-label ${lblClass}">${lbl}</div>`:''}</div>`;
     }).join('');
 
-    const allDone=round.every(m=>m.winner!==null);
+    const allDone=axeRoundComplete(round);
     const advBtn=editable&&isCurrentRound&&allDone&&ax.phase==='playing'?(
       isFinalRound
         ?`<button class="btn btn-gold" style="margin-top:.8rem;" onclick="axeFinalizeFinals('${exId}')">✅ Avslutt og tildel poeng</button>`
