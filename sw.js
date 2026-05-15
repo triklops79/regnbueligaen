@@ -1,4 +1,4 @@
-const CACHE = 'regnbueligaen-v3';
+const CACHE = 'regnbueligaen-v4';
 const ASSETS = [
   '/',
   '/index.html',

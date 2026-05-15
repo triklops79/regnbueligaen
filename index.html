@@ -17,6 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
 :root {
   --bg:#0b0c10;--surface:#13151c;--surface2:#1b1e2a;--surface3:#22263a;
@@ -199,6 +200,12 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 .timeline::before{content:'';position:absolute;left:.4rem;top:.5rem;bottom:.5rem;width:2px;background:linear-gradient(180deg,var(--border2),var(--border));}
 
 .prog-item{position:relative;margin-bottom:1rem;}
+.prog-item.dragging{opacity:.4;}
+.prog-drag-handle{position:absolute;left:-1.4rem;top:1rem;color:var(--muted);font-size:1.1rem;cursor:grab;padding:.3rem;user-select:none;z-index:2;}
+.prog-drag-handle:hover{color:var(--text);}
+@media (max-width:640px){
+  .prog-drag-handle{position:static;display:inline-block;margin-right:.5rem;}
+}
 .prog-item::before{content:'';position:absolute;left:-1.65rem;top:.55rem;width:10px;height:10px;border-radius:50%;border:2px solid var(--border2);background:var(--surface);transition:.2s;}
 .prog-item.type-required::before{background:var(--cocky);border-color:var(--cocky);box-shadow:0 0 8px rgba(245,166,35,.4);}
 .prog-item.type-optional::before{background:var(--bergen);border-color:var(--bergen);box-shadow:0 0 8px rgba(79,195,247,.3);}
@@ -338,7 +345,9 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 .p1-slot .point-slot-rank{color:var(--gold);}.p2-slot .point-slot-rank{color:var(--silver);}.p3-slot .point-slot-rank{color:var(--bronze);}.p4-slot .point-slot-rank{color:var(--muted);}
 .point-slot input{width:100%;text-align:center;font-family:'Bebas Neue',sans-serif;font-size:1.8rem;padding:.3rem;background:none;border:none;color:var(--text);outline:none;border-bottom:2px solid var(--border2);transition:.2s;}
 .point-slot input:focus{border-bottom-color:var(--admin);}
-.ex-admin-row{display:flex;align-items:center;justify-content:space-between;padding:.6rem .8rem;border-radius:8px;margin-bottom:.35rem;background:var(--surface2);border:1px solid var(--border);}
+.ex-admin-item{margin-bottom:.35rem;}
+.ex-admin-item.dragging{opacity:.4;}
+.ex-admin-row{display:flex;align-items:center;justify-content:space-between;padding:.6rem .8rem;border-radius:8px;background:var(--surface2);border:1px solid var(--border);}
 
 /* DRAG AND DROP */
 .ex-admin-row{cursor:grab;}
@@ -1912,11 +1921,8 @@ function renderAdmin(){
   if(!state.exercises.length){
     ael.innerHTML='<div class="empty" style="padding:.8rem;">Ingen øvelser ennå.</div>';
   } else {
-    ael.innerHTML=state.exercises.map((ex,i)=>`<div class="ex-admin-row" draggable="true" data-id="${ex.id}"
-      ondragstart="dndStart(event,'${ex.id}')"
-      ondragover="dndOver(event)"
-      ondragleave="dndLeave(event)"
-      ondrop="dndDrop(event,'${ex.id}')">
+    ael.innerHTML=state.exercises.map((ex,i)=>`<div class="ex-admin-item" data-id="${ex.id}">
+      <div class="ex-admin-row">
       <span class="drag-handle" title="Dra for å sortere">⠿</span>
       <span class="ex-order-num">${i+1}</span>
       <div style="flex:1;">
@@ -1927,11 +1933,12 @@ function renderAdmin(){
         <button class="btn btn-admin btn-sm" onclick="saveAsTemplate('${ex.id}')">💾 Lagre mal</button>
         <button class="btn btn-danger btn-sm" onclick="removeExercise('${ex.id}')">Slett</button>
       </div>
-    </div>
-    <div style="padding:.4rem .8rem .8rem;background:var(--surface2);margin-top:-4px;margin-bottom:.35rem;border-radius:0 0 8px 8px;border:1px solid var(--border);border-top:none;">
-      <label style="font-size:.73rem;font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);display:block;margin-bottom:4px;">📋 Regler</label>
-      <textarea class="rules-edit-area" placeholder="Skriv reglene for denne øvelsen her..." rows="3"
-        oninput="saveRules('${ex.id}',this.value)">${ex.rules||''}</textarea>
+      </div>
+      <div style="padding:.4rem .8rem .8rem;background:var(--surface2);margin-top:-4px;margin-bottom:.35rem;border-radius:0 0 8px 8px;border:1px solid var(--border);border-top:none;">
+        <label style="font-size:.73rem;font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);display:block;margin-bottom:4px;">📋 Regler</label>
+        <textarea class="rules-edit-area" placeholder="Skriv reglene for denne øvelsen her..." rows="3"
+          oninput="saveRules('${ex.id}',this.value)">${ex.rules||''}</textarea>
+      </div>
     </div>`).join('');
     initDragAndDrop();
   }
@@ -2783,45 +2790,65 @@ function axePlayerTeamChange(exId,idx,teamId){
 
 
 // ===== DRAG AND DROP REORDER =====
-let dragSrcId = null;
-
-function dndStart(event, id){
-  dragSrcId = id;
-  event.dataTransfer.effectAllowed = 'move';
-  setTimeout(()=>event.target.closest('.ex-admin-row').classList.add('dragging'), 0);
-}
-
-function dndOver(event){
-  event.preventDefault();
-  event.dataTransfer.dropEffect = 'move';
-  event.currentTarget.classList.add('drag-over');
-}
-
-function dndLeave(event){
-  event.currentTarget.classList.remove('drag-over');
-}
-
-function dndDrop(event, targetId){
-  event.preventDefault();
-  event.currentTarget.classList.remove('drag-over');
-  if(dragSrcId === targetId) return;
-  const srcIdx = state.exercises.findIndex(e=>e.id===dragSrcId);
-  const tgtIdx = state.exercises.findIndex(e=>e.id===targetId);
-  if(srcIdx===-1||tgtIdx===-1) return;
-  // Reorder
-  const [moved] = state.exercises.splice(srcIdx, 1);
-  state.exercises.splice(tgtIdx, 0, moved);
-  dragSrcId = null;
-  save(); renderAdmin(); renderExercises();
-}
+// ===== DRAG & DROP (SortableJS — works on both desktop and touch) =====
+let _sortableExercises = null;
+let _sortableProgramItems = []; // one per day
 
 function initDragAndDrop(){
-  // Clean up any lingering dragging classes after drop
-  document.querySelectorAll('.ex-admin-row').forEach(row=>{
-    row.addEventListener('dragend', ()=>{
-      row.classList.remove('dragging');
-      document.querySelectorAll('.ex-admin-row').forEach(r=>r.classList.remove('drag-over'));
+  if(typeof Sortable === 'undefined') return;
+
+  // Exercises list (in admin panel)
+  const exList = document.getElementById('admin-exercises-list');
+  if(exList){
+    if(_sortableExercises) _sortableExercises.destroy();
+    _sortableExercises = new Sortable(exList, {
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'dragging',
+      chosenClass: 'drag-over',
+      forceFallback: true, // better behavior on iOS
+      fallbackTolerance: 5,
+      onEnd: (evt) => {
+        if(evt.oldIndex === evt.newIndex) return;
+        // Read order from current DOM (wrapper elements only)
+        const newOrder = [...exList.querySelectorAll('.ex-admin-item')].map(el=>el.dataset.id);
+        const reordered = newOrder.map(id => state.exercises.find(e=>e.id===id)).filter(Boolean);
+        if(reordered.length === state.exercises.length){
+          state.exercises = reordered;
+          save();
+          // re-render to refresh order numbers + dashboard
+          renderAdmin(); renderExercises(); renderDashboard();
+        }
+      }
     });
+  }
+
+  // Program items: one Sortable per day
+  _sortableProgramItems.forEach(s=>s.destroy());
+  _sortableProgramItems = [];
+  document.querySelectorAll('.prog-items-list').forEach(list=>{
+    const dayId = list.dataset.dayId;
+    if(!dayId) return;
+    const s = new Sortable(list, {
+      handle: '.prog-drag-handle',
+      animation: 150,
+      ghostClass: 'dragging',
+      forceFallback: true,
+      fallbackTolerance: 5,
+      onEnd: (evt) => {
+        if(evt.oldIndex === evt.newIndex) return;
+        const day = state.program.days.find(d=>d.id===dayId);
+        if(!day) return;
+        const newOrder = [...list.querySelectorAll('.prog-item')].map(el=>el.dataset.itemId);
+        const reordered = newOrder.map(id=>day.items.find(it=>it.id===id)).filter(Boolean);
+        if(reordered.length === day.items.length){
+          day.items = reordered;
+          save();
+          renderProgram();
+        }
+      }
+    });
+    _sortableProgramItems.push(s);
   });
 }
 
@@ -2841,7 +2868,8 @@ function renderProgram(){
   const daysHTML = prog.days.map(day => {
     const itemsHTML = day.items.map(item => {
       if(isAdmin){
-        return `<div class="prog-item type-${item.type}">
+        return `<div class="prog-item type-${item.type}" data-item-id="${item.id}">
+          <span class="prog-drag-handle" title="Dra for å sortere">⠿</span>
           <div class="prog-edit-form">
             <div class="prog-edit-row">
               <div class="prog-field" style="max-width:90px;"><label>Tid</label>
@@ -2890,7 +2918,7 @@ function renderProgram(){
         `<div class="day-name">${day.name}</div><div class="day-date">${day.date}</div>`}
         ${isAdmin ? `<button class="btn btn-danger btn-sm" style="margin-left:auto;" onclick="progDeleteDay('${day.id}')">Slett dag</button>` : ''}
       </div>
-      <div class="timeline">${itemsHTML}</div>
+      <div class="${isAdmin?'timeline prog-items-list':'timeline'}" ${isAdmin?`data-day-id="${day.id}"`:''}>${itemsHTML}</div>
       ${addBtn}
     </div>`;
   }).join('');
@@ -2917,6 +2945,7 @@ function renderProgram(){
   const addDayBtn = isAdmin ? `<button class="btn btn-admin" style="margin-top:1rem;" onclick="progAddDay()">+ Legg til dag</button>` : '';
 
   el.innerHTML = titleHTML + legendHTML + daysHTML + addDayBtn;
+  if(isAdmin) initDragAndDrop();
 }
 
 function progUpdate(dayId, itemId, field, val){
