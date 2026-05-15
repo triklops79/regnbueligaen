@@ -995,14 +995,42 @@ function migrateState(){
             if(m.p2!==null && m.p2!==undefined) players.push(m.p2);
             m.players=players;
             m.scores={};
-            if(m.scoreP1!==null && m.scoreP1!==undefined) m.scores[m.p1]=m.scoreP1;
-            if(m.scoreP2!==null && m.scoreP2!==undefined && m.p2!==null) m.scores[m.p2]=m.scoreP2;
+            if(m.scoreP1!==null && m.scoreP1!==undefined) m.scores['p'+m.p1]=m.scoreP1;
+            if(m.scoreP2!==null && m.scoreP2!==undefined && m.p2!==null) m.scores['p'+m.p2]=m.scoreP2;
             m.winners=(m.winner!==null && m.winner!==undefined)?[m.winner]:[];
             // Old byes become solo matches with the player as winner — but new format never has byes.
             // If it was a bye, treat as already-resolved (player advances). We model by giving them as sole winner.
             // (cleanup: remove old keys to keep state tidy)
             delete m.p1; delete m.p2; delete m.scoreP1; delete m.scoreP2; delete m.winner; delete m.bye;
             dirty=true;
+          }
+          // Migrate scores from numeric keys (or array, after fixArrays mauled them) to p-prefixed keys.
+          // Numeric keys make Firebase + fixArrays treat scores as an array, which scrambles them on each load.
+          if(m && m.players && m.scores!==undefined){
+            // If scores is an array (from fixArrays), or a plain object with numeric keys, rebuild with p-prefix
+            const needsFix = Array.isArray(m.scores) ||
+              (typeof m.scores === 'object' && Object.keys(m.scores).some(k=>/^\d+$/.test(k)));
+            if(needsFix){
+              const fresh={};
+              // If it's an array, we honestly can't trust the indices anymore — they're scrambled.
+              // Best effort: assume sequential mapping isn't safe; clear scores to force re-entry.
+              if(Array.isArray(m.scores)){
+                // Can't safely recover — clear it
+                m.scores={};
+                m.winners=[];
+              } else {
+                // Object with numeric keys — keys should still correspond to playerIdx
+                Object.keys(m.scores).forEach(k=>{
+                  if(/^\d+$/.test(k)){
+                    fresh['p'+k]=m.scores[k];
+                  } else {
+                    fresh[k]=m.scores[k];
+                  }
+                });
+                m.scores=fresh;
+              }
+              dirty=true;
+            }
           }
         });
       });
@@ -2350,16 +2378,17 @@ function axeSetScore(exId,roundIdx,matchIdx,playerIdx,val){
   const match=ax.rounds[roundIdx][matchIdx];
   if(!match.scores) match.scores={};
   const v=val===''?null:(parseInt(val)>=0?parseInt(val):null);
-  if(v===null) delete match.scores[playerIdx];
-  else match.scores[playerIdx]=v;
+  const key='p'+playerIdx;
+  if(v===null) delete match.scores[key];
+  else match.scores[key]=v;
   // Auto-determine winners if all players have scores
-  const allHaveScores = match.players.every(p=>match.scores[p]!==undefined && match.scores[p]!==null);
+  const allHaveScores = match.players.every(p=>match.scores['p'+p]!==undefined && match.scores['p'+p]!==null);
   if(allHaveScores){
     // Sort by score desc
-    const sorted=[...match.players].sort((a,b)=>match.scores[b]-match.scores[a]);
+    const sorted=[...match.players].sort((a,b)=>match.scores['p'+b]-match.scores['p'+a]);
     if(match.isTriple){
       // top 2 advance, but only if 3rd place is strictly lower than 2nd (else ambiguous)
-      if(match.scores[sorted[1]]>match.scores[sorted[2]]){
+      if(match.scores['p'+sorted[1]]>match.scores['p'+sorted[2]]){
         match.winners=[sorted[0],sorted[1]];
       } else {
         // 2nd and 3rd tied — admin must resolve
@@ -2367,7 +2396,7 @@ function axeSetScore(exId,roundIdx,matchIdx,playerIdx,val){
       }
     } else {
       // duel: highest wins, ties → admin resolves
-      if(match.scores[sorted[0]]>match.scores[sorted[1]]){
+      if(match.scores['p'+sorted[0]]>match.scores['p'+sorted[1]]){
         match.winners=[sorted[0]];
       } else {
         match.winners=[];
@@ -2398,7 +2427,7 @@ function axeAdvanceRound(exId){
     m.players.forEach(p=>{
       if(!m.winners.includes(p)){
         // store score for tie-breaking among same-round eliminations
-        ax.players[p].lastScore=(m.scores&&m.scores[p]!==undefined)?m.scores[p]:0;
+        ax.players[p].lastScore=(m.scores&&m.scores['p'+p]!==undefined)?m.scores['p'+p]:0;
         losersThisRound.push(p);
       }
     });
@@ -2468,7 +2497,7 @@ function axeFinalizeFinals(exId){
       const top=m.winners; // length 2
       const loser=m.players.find(p=>!top.includes(p));
       // Among top, higher score = 1st
-      const sortedTop=[...top].sort((a,b)=>(m.scores[b]||0)-(m.scores[a]||0));
+      const sortedTop=[...top].sort((a,b)=>(m.scores['p'+b]||0)-(m.scores['p'+a]||0));
       ax.players[sortedTop[0]].placement=1;
       ax.players[sortedTop[1]].placement=2;
       ax.players[loser].placement=3;
@@ -2595,8 +2624,8 @@ function renderAxeCupHTML(exId,name,editable){
       const winners=Array.isArray(m.winners)?m.winners:[];
 
       // Determine if scores entry leads to a tie that requires manual resolution
-      const allHaveScores = matchPlayers.every(mp=>m.scores&&m.scores[mp.idx]!==undefined&&m.scores[mp.idx]!==null);
-      const sortedByScore = allHaveScores ? [...matchPlayers].sort((a,b)=>m.scores[b.idx]-m.scores[a.idx]) : [];
+      const allHaveScores = matchPlayers.every(mp=>m.scores&&m.scores['p'+mp.idx]!==undefined&&m.scores['p'+mp.idx]!==null);
+      const sortedByScore = allHaveScores ? [...matchPlayers].sort((a,b)=>m.scores['p'+b.idx]-m.scores['p'+a.idx]) : [];
       let tieNote='';
       if(scoreEditable && allHaveScores && winners.length===0){
         if(isTriple){
@@ -2612,7 +2641,7 @@ function renderAxeCupHTML(exId,name,editable){
         const isWinner=winners.includes(mp.idx);
         const decided=winners.length===(isTriple?2:1);
         const isLoser=decided && !isWinner;
-        const scoreVal=(m.scores&&m.scores[mp.idx]!==undefined&&m.scores[mp.idx]!==null)?m.scores[mp.idx]:'';
+        const scoreVal=(m.scores&&m.scores['p'+mp.idx]!==undefined&&m.scores['p'+mp.idx]!==null)?m.scores['p'+mp.idx]:'';
         const scoreInput=scoreEditable
           ? `<input class="axe-score-input" type="number" min="0" placeholder="–" value="${scoreVal}"
               style="border-color:${mp.team.color}66;color:${mp.team.color};"
