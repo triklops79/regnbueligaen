@@ -157,7 +157,36 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
 .divider{height:1px;background:var(--border);margin:.9rem 0;}
 .chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem;}
 .chip-captain{border-color:var(--gold)!important;color:var(--gold)!important;}
-.chip{background:var(--surface2);border:1px solid var(--border2);border-radius:20px;padding:.18rem .65rem;font-size:.85rem;}
+.chip{background:var(--surface2);border:1px solid var(--border2);border-radius:20px;padding:.18rem .65rem;font-size:.85rem;cursor:pointer;transition:.15s;}
+.chip:hover{background:var(--surface3);border-color:var(--muted2);}
+.chip-captain{border-color:var(--gold)!important;}
+
+/* Profile modal */
+.profile-modal{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto;}
+.profile-modal.open{display:flex;}
+.profile-box{background:var(--surface);border-radius:14px;padding:1.5rem;max-width:480px;width:100%;position:relative;border:1px solid var(--border2);}
+.profile-close{position:absolute;top:.6rem;right:.8rem;background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:.3rem .5rem;}
+.profile-close:hover{color:var(--text);}
+.profile-photo-wrap{display:flex;justify-content:center;margin-bottom:1rem;}
+.profile-photo{width:140px;height:140px;border-radius:50%;object-fit:cover;border:3px solid var(--border2);background:var(--surface2);}
+.profile-photo.has-img{border-color:currentColor;}
+.profile-photo-placeholder{display:flex;align-items:center;justify-content:center;font-size:3.5rem;color:var(--muted);}
+.profile-name{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;text-align:center;line-height:1;margin-bottom:.2rem;}
+.profile-nick{font-family:'Barlow Condensed',sans-serif;font-size:1rem;letter-spacing:1px;color:var(--muted2);text-align:center;margin-bottom:.4rem;font-style:italic;}
+.profile-team-row{text-align:center;margin-bottom:.6rem;display:flex;gap:.4rem;justify-content:center;align-items:center;flex-wrap:wrap;}
+.profile-team-badge{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:1.5px;text-transform:uppercase;padding:.2rem .7rem;border-radius:12px;border:1px solid currentColor;}
+.profile-captain-badge{background:linear-gradient(135deg,#ffd700,#ffaa00);color:#000;font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:2px;padding:.2rem .7rem;border-radius:12px;}
+.profile-stats{display:grid;grid-template-columns:1fr;gap:.6rem;margin-top:1rem;}
+.profile-stat{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .8rem;}
+.profile-stat-label{font-family:'Barlow Condensed',sans-serif;font-size:.72rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;}
+.profile-stat-value{font-family:'Barlow',sans-serif;font-size:.95rem;color:var(--text);line-height:1.4;white-space:pre-wrap;word-break:break-word;}
+.profile-stat-value.empty{color:var(--muted);font-style:italic;}
+.profile-edit-input,.profile-edit-textarea{width:100%;background:var(--surface);border:1px solid var(--border2);color:var(--text);padding:.4rem .6rem;border-radius:6px;font-family:'Barlow',sans-serif;font-size:.92rem;outline:none;}
+.profile-edit-input:focus,.profile-edit-textarea:focus{border-color:var(--admin);}
+.profile-edit-textarea{resize:vertical;min-height:60px;}
+.profile-edit-actions{display:flex;gap:.5rem;margin-top:1rem;justify-content:flex-end;}
+.profile-photo-upload{display:none;}
+.profile-photo-btn{position:absolute;bottom:0;right:0;background:var(--admin);color:#fff;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;}
 
 /* EXERCISE */
 .ex-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem 1.5rem;margin-bottom:1rem;}
@@ -865,6 +894,11 @@ main{max-width:1200px;margin:0 auto;padding:2rem;}
   </div>
 </div>
 </main>
+<!-- Profil-modal -->
+<div class="profile-modal" id="profile-modal" onclick="if(event.target===this)closeProfile()">
+  <div class="profile-box" id="profile-box"></div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script>
@@ -881,6 +915,7 @@ const GROUP_PAIRS = [[0,1],[2,3],[0,2],[1,3],[0,3],[1,2]];
 function defaultState(){
   return {
     members:{cocky:[],ossia:[],bergen:[],teisen:[]},
+    profiles:{},     // playerName -> {nickname, beerPerHour, strengths, weaknesses, bestExercise, photo}
     exercises:[],
     scores:{},       // non-tournament scores
     rawScores:{},    // raw input numbers for rawpoints exercises (separate from scores)
@@ -972,6 +1007,7 @@ function migrateState(){
   if(!state.tournaments) state.tournaments = {};
   if(!state.scores) state.scores = {};
   if(!state.rawScores) state.rawScores = {};
+  if(!state.profiles) state.profiles = {};
   if(!state.members) state.members = {cocky:[],ossia:[],bergen:[],teisen:[]};
   if(!state.pointScheme) state.pointScheme = {1:10,2:6,3:3,4:1};
   // Normalize pointScheme keys to numbers (Firebase stores as strings)
@@ -1272,7 +1308,9 @@ function adminAddMember(){
 }
 function removeMember(team,idx){
   const name=state.members[team][idx];
-  state.members[team].splice(idx,1);save();renderAll();toast(name+' fjernet','error');
+  state.members[team].splice(idx,1);
+  if(state.profiles && state.profiles[name]) delete state.profiles[name];
+  save();renderAll();toast(name+' fjernet','error');
 }
 
 // ===== SCORES (non-tournament) =====
@@ -1629,8 +1667,182 @@ function renderTeams(){
       <div class="tc-pts ${t.tc}">${totals[t.id]} <span style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;color:var(--muted);">pts</span></div>
       <div class="divider"></div>
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:.76rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem;">Spillere (${state.members[t.id].length})</div>
-      <div class="chips">${state.members[t.id].length===0?'<span style="color:var(--muted);font-size:.85rem;">Ingen spillere ennå</span>':state.members[t.id].map(m=>`<div class="chip${state.captains&&state.captains[t.id]===m?' chip-captain':''}">${state.captains&&state.captains[t.id]===m?'⭐ ':''}${m}</div>`).join('')}</div>
+      <div class="chips">${state.members[t.id].length===0?'<span style="color:var(--muted);font-size:.85rem;">Ingen spillere ennå</span>':state.members[t.id].map(m=>`<div class="chip${state.captains&&state.captains[t.id]===m?' chip-captain':''}" onclick="openProfileEnc('${profileAttr(m)}')" style="color:${t.color};">${state.captains&&state.captains[t.id]===m?'⭐ ':''}${m}</div>`).join('')}</div>
     </div>`).join('');
+}
+
+// Escape player name for inline HTML attribute use. Encodes via base64 to avoid
+// any quote/escape issues with names containing apostrophes, quotes, etc.
+function profileAttr(s){return btoa(unescape(encodeURIComponent(String(s))));}
+function openProfileEnc(enc){try{ openProfile(decodeURIComponent(escape(atob(enc)))); }catch(e){}}
+
+// ===== PROFILE MODAL =====
+let _profileEditing = false;
+let _profileCurrentName = null;
+
+function findPlayerTeam(name){
+  for(const t of TEAMS){
+    if(state.members[t.id] && state.members[t.id].includes(name)) return t;
+  }
+  return null;
+}
+
+function openProfile(name){
+  _profileCurrentName = name;
+  _profileEditing = false;
+  renderProfileModal();
+  document.getElementById('profile-modal').classList.add('open');
+}
+
+function closeProfile(){
+  document.getElementById('profile-modal').classList.remove('open');
+  _profileCurrentName = null;
+  _profileEditing = false;
+}
+
+function renderProfileModal(){
+  const name = _profileCurrentName;
+  if(!name) return;
+  const box = document.getElementById('profile-box');
+  const team = findPlayerTeam(name);
+  const profile = (state.profiles && state.profiles[name]) || {};
+  const isCaptain = team && state.captains && state.captains[team.id]===name;
+
+  const photoHTML = profile.photo
+    ? `<img class="profile-photo has-img" src="${profile.photo}" alt="" style="color:${team?team.color:'var(--muted2)'};">`
+    : `<div class="profile-photo profile-photo-placeholder">👤</div>`;
+
+  const teamRow = team ? `
+    <div class="profile-team-row">
+      ${isCaptain?`<span class="profile-captain-badge">⭐ Kaptein</span>`:''}
+      <span class="profile-team-badge" style="color:${team.color};">${team.name}</span>
+    </div>` : '';
+
+  if(_profileEditing && isAdmin){
+    // Editor mode
+    box.innerHTML = `
+      <button class="profile-close" onclick="closeProfile()">✕</button>
+      <div class="profile-photo-wrap" style="position:relative;">
+        <div style="position:relative;">
+          ${photoHTML}
+          <button class="profile-photo-btn" onclick="document.getElementById('profile-photo-input').click()" title="Last opp bilde">📷</button>
+          <input type="file" id="profile-photo-input" class="profile-photo-upload" accept="image/*" onchange="handleProfilePhoto(event)">
+        </div>
+      </div>
+      <div class="profile-name">${name}</div>
+      ${teamRow}
+      <div class="profile-stats">
+        <div class="profile-stat">
+          <div class="profile-stat-label">Kallenavn</div>
+          <input class="profile-edit-input" id="prof-nickname" type="text" value="${escapeHTML(profile.nickname||'')}" placeholder="F.eks. 'Bomberen'">
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-label">Øl per time</div>
+          <input class="profile-edit-input" id="prof-beer" type="text" value="${escapeHTML(profile.beerPerHour||'')}" placeholder="F.eks. '3-4 stk'">
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-label">Styrker</div>
+          <textarea class="profile-edit-textarea" id="prof-strengths" placeholder="F.eks. 'Sterk i dart, klar tale på fest'">${escapeHTML(profile.strengths||'')}</textarea>
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-label">Svakheter</div>
+          <textarea class="profile-edit-textarea" id="prof-weaknesses" placeholder="F.eks. 'Hopper inn i bare ræva på shots'">${escapeHTML(profile.weaknesses||'')}</textarea>
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-label">Beste øvelse</div>
+          <input class="profile-edit-input" id="prof-best" type="text" value="${escapeHTML(profile.bestExercise||'')}" placeholder="F.eks. 'Bowling'">
+        </div>
+      </div>
+      <div class="profile-edit-actions">
+        ${profile.photo?`<button class="btn btn-danger btn-sm" onclick="clearProfilePhoto()">Fjern bilde</button>`:''}
+        <button class="btn btn-sm" onclick="_profileEditing=false;renderProfileModal();">Avbryt</button>
+        <button class="btn btn-gold btn-sm" onclick="saveProfile()">💾 Lagre</button>
+      </div>
+    `;
+  } else {
+    // Viewer mode
+    const editBtn = isAdmin ? `<button class="btn btn-admin btn-sm" style="margin-top:1rem;width:100%;" onclick="_profileEditing=true;renderProfileModal();">✏️ Rediger profil</button>` : '';
+    const stat = (label, val) => `
+      <div class="profile-stat">
+        <div class="profile-stat-label">${label}</div>
+        <div class="profile-stat-value ${val?'':'empty'}">${val?escapeHTML(val):'– ikke fyllt inn –'}</div>
+      </div>`;
+    box.innerHTML = `
+      <button class="profile-close" onclick="closeProfile()">✕</button>
+      <div class="profile-photo-wrap">${photoHTML}</div>
+      <div class="profile-name">${name}</div>
+      ${profile.nickname?`<div class="profile-nick">"${escapeHTML(profile.nickname)}"</div>`:''}
+      ${teamRow}
+      <div class="profile-stats">
+        ${stat('Øl per time', profile.beerPerHour)}
+        ${stat('Styrker', profile.strengths)}
+        ${stat('Svakheter', profile.weaknesses)}
+        ${stat('Beste øvelse', profile.bestExercise)}
+      </div>
+      ${editBtn}
+    `;
+  }
+}
+
+function escapeHTML(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function saveProfile(){
+  const name = _profileCurrentName;
+  if(!name) return;
+  if(!state.profiles) state.profiles = {};
+  const existing = state.profiles[name] || {};
+  state.profiles[name] = {
+    nickname: document.getElementById('prof-nickname').value.trim(),
+    beerPerHour: document.getElementById('prof-beer').value.trim(),
+    strengths: document.getElementById('prof-strengths').value.trim(),
+    weaknesses: document.getElementById('prof-weaknesses').value.trim(),
+    bestExercise: document.getElementById('prof-best').value.trim(),
+    photo: existing.photo || null
+  };
+  save();
+  _profileEditing = false;
+  renderProfileModal();
+  toast('Profil lagret');
+}
+
+function clearProfilePhoto(){
+  const name = _profileCurrentName;
+  if(!name || !state.profiles || !state.profiles[name]) return;
+  state.profiles[name].photo = null;
+  save();
+  renderProfileModal();
+}
+
+function handleProfilePhoto(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){toast('Filen er ikke et bilde','error');return;}
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // Resize to max 200x200, square crop centered, output as jpeg ~0.75 quality
+      const size = 200;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      // Square crop: take min dimension as source square
+      const minDim = Math.min(img.width, img.height);
+      const sx = (img.width - minDim) / 2;
+      const sy = (img.height - minDim) / 2;
+      ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+      const dataURL = canvas.toDataURL('image/jpeg', 0.75);
+      const name = _profileCurrentName;
+      if(!state.profiles) state.profiles = {};
+      if(!state.profiles[name]) state.profiles[name] = {};
+      state.profiles[name].photo = dataURL;
+      save();
+      renderProfileModal();
+      toast('Bilde lastet opp');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 
