@@ -1799,7 +1799,10 @@ function saveProfile(){
     bestExercise: document.getElementById('prof-best').value.trim(),
     photo: existing.photo || null
   };
-  save();
+  // Flush save immediately — bypass the 1s debounce, otherwise the realtime
+  // listener can overwrite the in-memory state before the save lands.
+  if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+  saveToCloud();
   _profileEditing = false;
   renderProfileModal();
   toast('Profil lagret');
@@ -1809,7 +1812,8 @@ function clearProfilePhoto(){
   const name = _profileCurrentName;
   if(!name || !state.profiles || !state.profiles[name]) return;
   state.profiles[name].photo = null;
-  save();
+  if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+  saveToCloud();
   renderProfileModal();
 }
 
@@ -1836,7 +1840,8 @@ function handleProfilePhoto(event){
       if(!state.profiles) state.profiles = {};
       if(!state.profiles[name]) state.profiles[name] = {};
       state.profiles[name].photo = dataURL;
-      save();
+      if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+      saveToCloud();
       renderProfileModal();
       toast('Bilde lastet opp');
     };
